@@ -1,0 +1,9 @@
+[project]
+name = "boilergen"
+version = "0.1.0"
+description = "CLI tool for running boilergen"
+dependencies = ["typer[all]"]
+requires-python = ">=3.10"
+
+[project.scripts]
+boilergen = "boilergen.main:app"

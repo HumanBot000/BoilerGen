@@ -1,19 +1,20 @@
 import os
 import typer
 from rich.panel import Panel
-
-from core.navigator import navigate_templates
-from core.display import display_final_selection, build_directory_tree, console
+from pathlib import Path
+from boilergen.core.navigator import navigate_templates
+from boilergen.core.display import display_final_selection, build_directory_tree, console
 
 app = typer.Typer(help="🔍 Navigate and select templates from your directory structure")
-
+DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(),"boilergen", "templates")
 
 @app.command()
-def select(
-        template_dir: str = typer.Argument(
-            ...,
-            help="Path to the template root directory"
-        ),
+def create(
+        template_dir: Path = typer.Argument(
+            default=DEFAULT_TEMPLATE_DIR,
+            help="Path to the template root directory",
+            file_okay=False
+        )
 ):
     """
     🔍 Navigate and select templates from your directory structure.
@@ -40,14 +41,16 @@ def select(
 
 @app.command()
 def templates(
-        template_dir: str = typer.Argument(
-            ...,
-            help="Path to the template root directory"
+        template_dir: Path = typer.Argument(
+            default=DEFAULT_TEMPLATE_DIR,
+            help="Path to the template root directory",
+            file_okay=False
         )
 ):
     """
     🌳 Display a tree view of all available templates.
     """
+    template_dir = str(template_dir)
     if not os.path.exists(template_dir):
         console.print(f"[red]Error: Template directory '{template_dir}' does not exist.[/red]")
         raise typer.Exit(1)
