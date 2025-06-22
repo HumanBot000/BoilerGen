@@ -17,7 +17,7 @@ from .display import (
 
 
 def find_all_dependents_recursive(template_id: str, all_templates: Dict[str, Template], selected_ids: List[str]) -> \
-List[str]:
+        List[str]:
     """
     Find all templates that depend on the given template ID recursively.
     This includes direct dependents and their dependents.
@@ -43,6 +43,7 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
     """Navigate through template directories with enhanced UX and dependency management."""
     current_path = base_path
     selected_template_ids = []
+    excluded_template_ids = []  # Track templates user explicitly excluded in run mode
     navigation_history = []
 
     # Load all templates for dependency resolution
@@ -57,6 +58,12 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
 
         # Resolve dependencies and get auto-selected templates
         all_required_ids, auto_selected_ids = resolve_dependencies(selected_template_ids, all_templates)
+
+        # In run mode, filter out explicitly excluded templates
+        if run_mode:
+            all_required_ids = [tid for tid in all_required_ids if tid not in excluded_template_ids]
+            auto_selected_ids = [tid for tid in auto_selected_ids if tid not in excluded_template_ids]
+
         selected_templates = [all_templates[tid] for tid in all_required_ids if tid in all_templates]
 
         # Show current selection
@@ -214,8 +221,8 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
                             console.print(
                                 f"[red]Note: '{template.label}' will be removed. Use caution.[/red]")
                             questionary.press_any_key_to_continue("Press any key to continue...").ask()
-                            auto_selected_ids.remove(template.id)
-                            selected_templates.remove(template)
+                            # Add to excluded list to prevent it from being auto-selected again
+                            excluded_template_ids.append(template.id)
                 else:
                     # Normal mode: prevent deselection of auto-selected dependencies
                     manually_selected_dependents = []
@@ -240,6 +247,9 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
 
             else:
                 # User wants to select a template that's not currently selected
+                # If it was previously excluded, remove from excluded list
+                if template.id in excluded_template_ids:
+                    excluded_template_ids.remove(template.id)
                 selected_template_ids.append(template.id)
 
         elif action == "navigate":
@@ -258,4 +268,9 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
 
     # Return the final resolved list of templates
     final_required_ids, _ = resolve_dependencies(selected_template_ids, all_templates)
+
+    # In run mode, filter out explicitly excluded templates from final result
+    if run_mode:
+        final_required_ids = [tid for tid in final_required_ids if tid not in excluded_template_ids]
+
     return [all_templates[tid] for tid in final_required_ids if tid in all_templates]
