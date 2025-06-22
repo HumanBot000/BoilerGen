@@ -39,7 +39,8 @@ def find_all_dependents_recursive(template_id: str, all_templates: Dict[str, Tem
     return list(all_dependents)
 
 
-def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) -> List[Template]:
+def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False, minimal_ui: bool = False) -> List[
+    Template]:
     """Navigate through template directories with enhanced UX and dependency management."""
     current_path = base_path
     selected_template_ids = []
@@ -50,11 +51,13 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
     all_templates = find_all_templates(base_path)
 
     while True:
-        # Clear screen for better UX
         clear_shell()
 
         breadcrumb = get_breadcrumb_path(current_path, base_path)
-        console.print(f"\n[bold]{breadcrumb}[/bold]\n")
+        if minimal_ui:
+            print(f"\n{breadcrumb}\n")
+        else:
+            console.print(f"\n[bold]{breadcrumb}[/bold]\n")
 
         # Resolve dependencies and get auto-selected templates
         all_required_ids, auto_selected_ids = resolve_dependencies(selected_template_ids, all_templates)
@@ -67,8 +70,13 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
         selected_templates = [all_templates[tid] for tid in all_required_ids if tid in all_templates]
 
         # Show current selection
-        display_current_selection(selected_templates, auto_selected_ids, all_templates, dependencie_disabled_mode)
-        console.print()
+        display_current_selection(selected_templates, auto_selected_ids, all_templates, dependencie_disabled_mode,
+                                  minimal_ui)
+
+        if minimal_ui:
+            print()
+        else:
+            console.print()
 
         subgroups, templates = list_subgroups_and_templates(current_path)
 
@@ -82,11 +90,11 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
                 is_auto_selected = template.id in auto_selected_ids
 
                 if is_manually_selected:
-                    status = "✓"
+                    status = "✓" if not minimal_ui else "[X]"
                 elif is_auto_selected:
-                    status = "✓"
+                    status = "✓" if not minimal_ui else "[X]"
                 else:
-                    status = "○"
+                    status = "○" if not minimal_ui else "[ ]"
 
                 title = f"{status} {template.label} ({template.id})"
                 if is_auto_selected:
@@ -94,7 +102,8 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
 
                 # Show dependencies info
                 if template.requires:
-                    title += f" → requires: {', '.join(template.requires)}"
+                    dep_text = f" -> requires: {', '.join(template.requires)}" if minimal_ui else f" → requires: {', '.join(template.requires)}"
+                    title += dep_text
 
                 choices.append(questionary.Choice(
                     title=title,
@@ -104,27 +113,36 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
         # Add subdirectories
         if subgroups:
             for subgroup in subgroups:
+                folder_icon = "📁"
                 choices.append(questionary.Choice(
-                    title=f"📁 {subgroup}",
+                    title=f"{folder_icon} {subgroup}",
                     value=("navigate", subgroup),
                 ))
 
         # Add navigation options
         if choices:
+            separator = "-" * 40
             choices.append(questionary.Choice(
-                title="─" * 40,
+                title=separator,
                 value=("separator", None),
                 disabled=True
             ))
 
         if navigation_history:
+            back_text = "<-- Go Back" if minimal_ui else "⬅️  Go Back"
             choices.append(questionary.Choice(
-                title="⬅️  Go Back",
+                title=back_text,
                 value=("back", None),
             ))
 
+        finish_text = "Finish Selection"
+        if selected_templates:
+            finish_text += f" ({len(selected_templates)} selected)"
+        if not minimal_ui:
+            finish_text = "✅ " + finish_text
+
         choices.append(questionary.Choice(
-            title="✅ Finish Selection" + (f" ({len(selected_templates)} selected)" if selected_templates else ""),
+            title=finish_text,
             value=("finish", None),
         ))
 
@@ -132,22 +150,37 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
             break
 
         # Show the selection menu
-        console.print()
+        if minimal_ui:
+            print()
+        else:
+            console.print()
+
         try:
-            selection = questionary.select(
-                "What would you like to do?",
-                choices=choices,
-                style=questionary.Style([
-                    ('selected', 'fg:#ffffff bg:#0066cc bold'),
-                    ('pointer', 'fg:#0066cc bold'),
-                    ('question', 'fg:#ff9900 bold'),
-                    ('answer', 'fg:#22cc22 bold'),  # Green for manually selected
-                    ('highlighted', 'fg:#ffaa00 bold'),  # Yellow/orange for auto-selected
-                ]),
-                use_shortcuts=True,
-            ).ask()
+            if minimal_ui:
+                # Use a simpler style for minimal UI
+                selection = questionary.select(
+                    "What would you like to do?",
+                    choices=choices,
+                    use_shortcuts=True,
+                ).ask()
+            else:
+                selection = questionary.select(
+                    "What would you like to do?",
+                    choices=choices,
+                    style=questionary.Style([
+                        ('selected', 'fg:#ffffff bg:#0066cc bold'),
+                        ('pointer', 'fg:#0066cc bold'),
+                        ('question', 'fg:#ff9900 bold'),
+                        ('answer', 'fg:#22cc22 bold'),  # Green for manually selected
+                        ('highlighted', 'fg:#ffaa00 bold'),  # Yellow/orange for auto-selected
+                    ]),
+                    use_shortcuts=True,
+                ).ask()
         except KeyboardInterrupt:
-            console.print("\n[yellow]Selection cancelled.[/yellow]")
+            if minimal_ui:
+                print("\nSelection cancelled.")
+            else:
+                console.print("\n[yellow]Selection cancelled.[/yellow]")
             return []
 
         if not selection:
@@ -163,11 +196,18 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
                 dependents = find_all_dependents_recursive(template.id, all_templates, selected_template_ids)
 
                 if dependents and dependencie_disabled_mode:
-                    # Show warning about dependents only in --disable-dependencies mode (--disable-dependencies)
+                    # Show warning about dependents only in --disable-dependencies mode
                     dependent_names = [all_templates[dep_id].label for dep_id in dependents if dep_id in all_templates]
-                    console.print(f"\n[yellow]Warning: The following templates depend on '{template.label}':[/yellow]")
-                    for dep_name in dependent_names:
-                        console.print(f"  - {dep_name}")
+
+                    if minimal_ui:
+                        print(f"\nWarning: The following templates depend on '{template.label}':")
+                        for dep_name in dependent_names:
+                            print(f"  - {dep_name}")
+                    else:
+                        console.print(
+                            f"\n[yellow]Warning: The following templates depend on '{template.label}':[/yellow]")
+                        for dep_name in dependent_names:
+                            console.print(f"  - {dep_name}")
 
                     confirm = questionary.confirm(
                         "Do you want to deselect them as well?",
@@ -207,10 +247,16 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
 
                     if manually_selected_dependents:
                         dependent_names = [all_templates[dep_id].label for dep_id in manually_selected_dependents]
-                        console.print(
-                            f"\n[red]Warning: Removing dependency '{template.label}' may cause issues with:[/red]")
-                        for dep_name in dependent_names:
-                            console.print(f"  - {dep_name}")
+
+                        if minimal_ui:
+                            print(f"\nWarning: Removing dependency '{template.label}' may cause issues with:")
+                            for dep_name in dependent_names:
+                                print(f"  - {dep_name}")
+                        else:
+                            console.print(
+                                f"\n[red]Warning: Removing dependency '{template.label}' may cause issues with:[/red]")
+                            for dep_name in dependent_names:
+                                console.print(f"  - {dep_name}")
 
                         confirm = questionary.confirm(
                             "Continue anyway? This may cause template conflicts.",
@@ -218,9 +264,12 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
                         ).ask()
 
                         if confirm:
-                            console.print(
-                                f"[red]Note: '{template.label}' will be removed. Use caution.[/red]")
-                            questionary.press_any_key_to_continue("Press any key to continue...").ask()
+                            if minimal_ui:
+                                print(f"Note: '{template.label}' will be removed. Use caution.")
+                                input("Press Enter to continue...")
+                            else:
+                                console.print(f"[red]Note: '{template.label}' will be removed. Use caution.[/red]")
+                                questionary.press_any_key_to_continue("Press any key to continue...").ask()
                             # Add to excluded list to prevent it from being auto-selected again
                             excluded_template_ids.append(template.id)
                 else:
@@ -236,14 +285,20 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) 
 
                     if manually_selected_dependents:
                         dependent_names = [all_templates[dep_id].label for dep_id in manually_selected_dependents]
-                        console.print(f"\n[yellow]Cannot deselect '{template.label}' as it's required by:[/yellow]")
-                        for dep_name in dependent_names:
-                            console.print(f"  - {dep_name}")
-                        console.print(
-                            "[yellow]Deselect those templates first if you want to remove this dependency.[/yellow]")
 
-                        # Wait for user acknowledgment
-                        questionary.press_any_key_to_continue("Press any key to continue...").ask()
+                        if minimal_ui:
+                            print(f"\nCannot deselect '{template.label}' as it's required by:")
+                            for dep_name in dependent_names:
+                                print(f"  - {dep_name}")
+                            print("Deselect those templates first if you want to remove this dependency.")
+                            input("Press Enter to continue...")
+                        else:
+                            console.print(f"\n[yellow]Cannot deselect '{template.label}' as it's required by:[/yellow]")
+                            for dep_name in dependent_names:
+                                console.print(f"  - {dep_name}")
+                            console.print(
+                                "[yellow]Deselect those templates first if you want to remove this dependency.[/yellow]")
+                            questionary.press_any_key_to_continue("Press any key to continue...").ask()
 
             else:
                 # User wants to select a template that's not currently selected
