@@ -9,11 +9,11 @@ from .template_finder import (
 )
 from .template import Template
 from .display import (
-    clear_shell,
     get_breadcrumb_path,
     display_current_selection,
     console
 )
+from ..cli import clear_shell
 
 
 def find_all_dependents_recursive(template_id: str, all_templates: Dict[str, Template], selected_ids: List[str]) -> \

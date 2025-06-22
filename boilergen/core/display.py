@@ -1,17 +1,17 @@
 import os
 from typing import List, Dict
+
+import questionary
 from rich.console import Console
 from rich.panel import Panel
 from rich.tree import Tree
 from rich.text import Text
+
+import boilergen.builder.output_selection
 from .template import Template
+from ..cli import clear_shell
 
 console = Console()
-
-
-def clear_shell():
-    """Clear the terminal screen."""
-    os.system('cls' if os.name == 'nt' else 'clear')
 
 
 def get_breadcrumb_path(current_path: str, base_path: str) -> str:
@@ -202,7 +202,6 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
 
         title = f"✅ Selection Complete - {len(selected_templates)} template(s) selected"
 
-        # Fix: Create the panel content properly
         if legend_parts:
             # Create a multi-line content with tree and legend
             from rich.console import Group
@@ -219,6 +218,13 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
             border_style="green",
             padding=(1, 2)
         ))
+        print("=" * 50)
+        if minimal_ui:
+            input("Press Any key to continue...")
+            print("From here on you will exit --minimal-ui mode")
+        else:
+            questionary.press_any_key_to_continue("Press any key to continue to project generation...").ask()
+        boilergen.builder.output_selection.ask_for_output_location(selected_templates)
 
 
 def build_directory_tree(template_dir: str, base_path: str, minimal_ui: bool = False) -> str:
