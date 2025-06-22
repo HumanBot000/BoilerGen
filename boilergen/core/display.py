@@ -1,8 +1,10 @@
 import os
-from typing import List
+from typing import List, Dict
 from rich.console import Console
 from rich.panel import Panel
 from rich.tree import Tree
+from rich.text import Text
+from .template import Template
 
 console = Console()
 
@@ -20,19 +22,40 @@ def get_breadcrumb_path(current_path: str, base_path: str) -> str:
     return f"📁 Root → {rel_path.replace(os.sep, ' → ')}"
 
 
-def display_current_selection(selected_templates: List[str], base_path: str):
+def display_current_selection(selected_templates: List[Template], auto_selected_ids: List[str],
+                              all_templates: Dict[str, Template], run_mode: bool = False):
     """Display currently selected templates in a nice format."""
     if not selected_templates:
-        console.print("📝 [dim]No templates selected yet[/dim]")
+        text = Text("📝 No templates selected yet", style="dim")
+        console.print(text)
         return
 
     console.print(f"📝 [bold green]Selected Templates ({len(selected_templates)}):[/bold green]")
+
     for template in selected_templates:
-        rel_path = os.path.relpath(template, base_path)
-        console.print(f"   ✓ [green]{rel_path}[/green]")
+        marker = "✓"
+        style = "green"
+        suffix = ""
+
+        if template.id in auto_selected_ids:
+            marker = "✓"
+            suffix = " *"
+            style = "yellow"
+
+        # Check if template has missing dependencies (for run mode warning)
+        missing_deps = []
+        if run_mode:
+            for dep_id in template.requires:
+                if dep_id not in [t.id for t in selected_templates]:
+                    missing_deps.append(dep_id)
+
+            if missing_deps:
+                console.print(f"       ⚠️ Missing: {', '.join(missing_deps)}", style="red")
+        console.print(f"   {marker} {template.label} ({template.id}){suffix}", style=style)
 
 
-def display_final_selection(selected_templates: List[str], base_path: str):
+def display_final_selection(selected_templates: List[Template], base_path: str,
+                            auto_selected_ids: List[str], run_mode: bool = False):
     """Display the final selection in a nice format."""
     clear_shell()
     if not selected_templates:
@@ -48,17 +71,16 @@ def display_final_selection(selected_templates: List[str], base_path: str):
 
     # Group templates by their directory structure
     template_groups = {}
-    for template_path in selected_templates:
-        rel_path = os.path.relpath(template_path, base_path)
+    for template in selected_templates:
+        rel_path = os.path.relpath(template.path, base_path)
         dir_path = os.path.dirname(rel_path)
-        template_name = os.path.basename(rel_path)
 
         if dir_path == ".":
             dir_path = "Root"
 
         if dir_path not in template_groups:
             template_groups[dir_path] = []
-        template_groups[dir_path].append(template_name)
+        template_groups[dir_path].append(template)
 
     # Build the tree
     for dir_path, templates in sorted(template_groups.items()):
@@ -67,12 +89,46 @@ def display_final_selection(selected_templates: List[str], base_path: str):
         else:
             branch = tree.add(f"📂 {dir_path}")
 
-        for template in sorted(templates):
-            branch.add(f"📄 {template}")
+        for template in sorted(templates, key=lambda t: t.label):
+            marker = "📄"
+            suffix = ""
+            style = ""
+
+            if template.id in auto_selected_ids:
+                suffix = " *"
+                style = "yellow"
+
+            # Check for missing dependencies in run mode
+            missing_deps = []
+            if run_mode:
+                for dep_id in template.requires:
+                    if dep_id not in [t.id for t in selected_templates]:
+                        missing_deps.append(dep_id)
+
+            if missing_deps:
+                suffix += f" ⚠️"
+                style = "red"
+
+            display_text = f"{marker} {template.label} ({template.id}){suffix}"
+
+            branch.add(display_text, style=style if style else None)
+
+    # Add legend
+    legend_text = ""
+    if auto_selected_ids:
+        legend_text += "* = Auto-selected dependency\n"
+    if run_mode:
+        legend_text += "⚠️ = Missing dependencies (run mode)"
+
+    title = f"✅ Selection Complete - {len(selected_templates)} template(s) selected"
+
+    panel_content = tree
+    if legend_text:
+        panel_content = f"{tree}\n\n{legend_text.strip()}"
 
     console.print(Panel(
-        tree,
-        title=f"✅ Selection Complete - {len(selected_templates)} template(s) selected",
+        panel_content,
+        title=title,
         border_style="green",
         padding=(1, 2)
     ))
@@ -87,7 +143,7 @@ def build_directory_tree(template_dir: str, base_path: str) -> Tree:
 
         # Add templates
         for template in templates:
-            tree_node.add(f"📄 {template}")
+            tree_node.add(f"📄 {template.label} ({template.id})")
 
         # Add subdirectories
         for subgroup in subgroups:

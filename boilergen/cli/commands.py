@@ -4,9 +4,11 @@ from rich.panel import Panel
 from pathlib import Path
 from boilergen.core.navigator import navigate_templates
 from boilergen.core.display import display_final_selection, build_directory_tree, console
+from boilergen.core.template_finder import find_all_templates, resolve_dependencies
 
 app = typer.Typer(help="🔍 Navigate and select templates from your directory structure")
-DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(),"boilergen", "templates")
+DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(), "boilergen", "templates")
+
 
 @app.command()
 def create(
@@ -14,14 +16,13 @@ def create(
             default=DEFAULT_TEMPLATE_DIR,
             help="Path to the template root directory",
             file_okay=False
+        ),
+        run: bool = typer.Option(
+            False,
+            "--disable-dependencies",
+            help="Disables dependency de-selection warnings"
         )
 ):
-    """
-    🔍 Navigate and select templates from your directory structure.
-
-    This interactive tool helps you browse through template directories
-    and select the ones you need for your project.
-    """
     if not os.path.exists(template_dir):
         console.print(f"[red]Error: Template directory '{template_dir}' does not exist.[/red]")
         raise typer.Exit(1)
@@ -31,8 +32,19 @@ def create(
         raise typer.Exit(1)
 
     try:
-        selected_templates = navigate_templates(template_dir)
-        display_final_selection(selected_templates, template_dir)
+        selected_templates = navigate_templates(template_dir, run_mode=run)
+
+        manually_selected_ids = []  # We don't track this separately in the current implementation
+        all_selected_ids = [t.id for t in selected_templates]
+
+        # For display purposes, we'll assume any dependency is auto-selected
+        auto_selected_ids = []
+        for template in selected_templates:
+            for dep_id in template.requires:
+                if dep_id in all_selected_ids and dep_id not in manually_selected_ids:
+                    auto_selected_ids.append(dep_id)
+
+        display_final_selection(selected_templates, template_dir, auto_selected_ids, run_mode=run)
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Operation cancelled by user.[/yellow]")
