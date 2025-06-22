@@ -38,7 +38,7 @@ def create(
         raise typer.Exit(1)
 
     try:
-        selected_templates = navigate_templates(template_dir, run_mode=disable_dependencies)
+        selected_templates = navigate_templates(template_dir, dependencie_disabled_mode=disable_dependencies)
 
         manually_selected_ids = []  # We don't track this separately in the current implementation
         all_selected_ids = [t.id for t in selected_templates]

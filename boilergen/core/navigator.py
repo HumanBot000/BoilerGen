@@ -39,11 +39,11 @@ def find_all_dependents_recursive(template_id: str, all_templates: Dict[str, Tem
     return list(all_dependents)
 
 
-def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]:
+def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False) -> List[Template]:
     """Navigate through template directories with enhanced UX and dependency management."""
     current_path = base_path
     selected_template_ids = []
-    excluded_template_ids = []  # Track templates user explicitly excluded in run mode
+    excluded_template_ids = []  # Track templates user explicitly excluded in --disable-dependencies mode
     navigation_history = []
 
     # Load all templates for dependency resolution
@@ -59,15 +59,15 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
         # Resolve dependencies and get auto-selected templates
         all_required_ids, auto_selected_ids = resolve_dependencies(selected_template_ids, all_templates)
 
-        # In run mode, filter out explicitly excluded templates
-        if run_mode:
+        # In --disable-dependencies mode, filter out explicitly excluded templates
+        if dependencie_disabled_mode:
             all_required_ids = [tid for tid in all_required_ids if tid not in excluded_template_ids]
             auto_selected_ids = [tid for tid in auto_selected_ids if tid not in excluded_template_ids]
 
         selected_templates = [all_templates[tid] for tid in all_required_ids if tid in all_templates]
 
         # Show current selection
-        display_current_selection(selected_templates, auto_selected_ids, all_templates, run_mode)
+        display_current_selection(selected_templates, auto_selected_ids, all_templates, dependencie_disabled_mode)
         console.print()
 
         subgroups, templates = list_subgroups_and_templates(current_path)
@@ -162,8 +162,8 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
                 # User wants to deselect - check for dependents
                 dependents = find_all_dependents_recursive(template.id, all_templates, selected_template_ids)
 
-                if dependents and run_mode:
-                    # Show warning about dependents only in run mode (--disable-dependencies)
+                if dependents and dependencie_disabled_mode:
+                    # Show warning about dependents only in --disable-dependencies mode (--disable-dependencies)
                     dependent_names = [all_templates[dep_id].label for dep_id in dependents if dep_id in all_templates]
                     console.print(f"\n[yellow]Warning: The following templates depend on '{template.label}':[/yellow]")
                     for dep_name in dependent_names:
@@ -193,8 +193,8 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
 
             elif template.id in auto_selected_ids:
                 # User is trying to deselect an auto-selected dependency
-                if run_mode:
-                    # In run mode (--disable-dependencies), allow deselecting auto-selected dependencies
+                if dependencie_disabled_mode:
+                    # In --disable-dependencies, allow deselecting auto-selected dependencies
                     # but show warning about potential issues
                     manually_selected_dependents = []
                     for selected_id in selected_template_ids:
@@ -269,8 +269,8 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
     # Return the final resolved list of templates
     final_required_ids, _ = resolve_dependencies(selected_template_ids, all_templates)
 
-    # In run mode, filter out explicitly excluded templates from final result
-    if run_mode:
+    # In --disable-dependencies mode, filter out explicitly excluded templates from final result
+    if dependencie_disabled_mode:
         final_required_ids = [tid for tid in final_required_ids if tid not in excluded_template_ids]
 
     return [all_templates[tid] for tid in final_required_ids if tid in all_templates]

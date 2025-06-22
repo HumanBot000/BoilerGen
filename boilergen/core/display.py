@@ -42,7 +42,7 @@ def display_current_selection(selected_templates: List[Template], auto_selected_
             suffix = " *"
             style = "yellow"
 
-        # Check if template has missing dependencies (for run mode warning)
+        # Check if template has missing dependencies (for --disable-dependencies mode warning)
         missing_deps = []
         if run_mode:
             for dep_id in template.requires:
@@ -98,7 +98,7 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
                 suffix = " *"
                 style = "yellow"
 
-            # Check for missing dependencies in run mode
+            # Check for missing dependencies in --disable-dependencies mode
             missing_deps = []
             if run_mode:
                 for dep_id in template.requires:
@@ -114,17 +114,24 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
             branch.add(display_text, style=style if style else None)
 
     # Add legend
-    legend_text = ""
+    legend_parts = []
     if auto_selected_ids:
-        legend_text += "* = Auto-selected dependency\n"
+        legend_parts.append("* = Auto-selected dependency")
     if run_mode:
-        legend_text += "⚠️ = Missing dependencies (run mode)"
+        legend_parts.append("⚠️ = Missing dependencies (--disable-dependencies)")
 
     title = f"✅ Selection Complete - {len(selected_templates)} template(s) selected"
 
-    panel_content = tree
-    if legend_text:
-        panel_content = f"{tree}\n\n{legend_text.strip()}"
+    # Fix: Create the panel content properly
+    if legend_parts:
+        # Create a multi-line content with tree and legend
+        from rich.console import Group
+        from rich.text import Text
+
+        legend_text = Text("\n" + "\n".join(legend_parts))
+        panel_content = Group(tree, legend_text)
+    else:
+        panel_content = tree
 
     console.print(Panel(
         panel_content,
