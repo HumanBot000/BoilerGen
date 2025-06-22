@@ -6,4 +6,4 @@ dependencies = ["typer[all]"]
 requires-python = ">=3.10"
 
 [project.scripts]
-boilergen = "boilergen.main:app"
+boilergen = "boilergen.__main__:app"

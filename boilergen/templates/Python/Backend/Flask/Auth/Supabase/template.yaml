@@ -1,0 +1,3 @@
+id: supabaseAuth
+label: "Flask Base App"
+requires: [flask]

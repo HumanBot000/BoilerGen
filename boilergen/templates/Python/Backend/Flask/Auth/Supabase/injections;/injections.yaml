@@ -1,0 +1,20 @@
+injections:
+  - on: flask
+    at:
+      file: api/main.py
+      tag: imports
+    method:
+      insert:
+        - bottom
+    from: imports.py
+    tag: "*"
+
+  - on: flask
+    at:
+      file: api/main.py
+      tag: init
+    method:
+      insert:
+        - bottom
+    from: register_bp.py
+    tag: "*"
