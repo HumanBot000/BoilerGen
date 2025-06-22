@@ -17,12 +17,18 @@ def create(
             help="Path to the template root directory",
             file_okay=False
         ),
-        run: bool = typer.Option(
+        disable_dependencies: bool = typer.Option(
             False,
             "--disable-dependencies",
-            help="Disables dependency de-selection warnings"
+            help="Show warnings when deselecting templates with dependencies (expert mode)"
         )
 ):
+    """
+    🚀 Create a new project by selecting templates interactively.
+
+    By default, dependencies are handled automatically. Use --disable-dependencies
+    to get warnings and manual control over dependency conflicts.
+    """
     if not os.path.exists(template_dir):
         console.print(f"[red]Error: Template directory '{template_dir}' does not exist.[/red]")
         raise typer.Exit(1)
@@ -32,7 +38,7 @@ def create(
         raise typer.Exit(1)
 
     try:
-        selected_templates = navigate_templates(template_dir, run_mode=run)
+        selected_templates = navigate_templates(template_dir, run_mode=disable_dependencies)
 
         manually_selected_ids = []  # We don't track this separately in the current implementation
         all_selected_ids = [t.id for t in selected_templates]
@@ -44,7 +50,7 @@ def create(
                 if dep_id in all_selected_ids and dep_id not in manually_selected_ids:
                     auto_selected_ids.append(dep_id)
 
-        display_final_selection(selected_templates, template_dir, auto_selected_ids, run_mode=run)
+        display_final_selection(selected_templates, template_dir, auto_selected_ids, run_mode=disable_dependencies)
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Operation cancelled by user.[/yellow]")

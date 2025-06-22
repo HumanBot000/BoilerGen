@@ -16,6 +16,29 @@ from .display import (
 )
 
 
+def find_all_dependents_recursive(template_id: str, all_templates: Dict[str, Template], selected_ids: List[str]) -> \
+List[str]:
+    """
+    Find all templates that depend on the given template ID recursively.
+    This includes direct dependents and their dependents.
+    """
+    all_dependents = set()
+    to_check = [template_id]
+
+    while to_check:
+        current_id = to_check.pop(0)
+
+        # Find direct dependents of current template
+        direct_dependents = find_dependents(current_id, all_templates, selected_ids)
+
+        for dep_id in direct_dependents:
+            if dep_id not in all_dependents:
+                all_dependents.add(dep_id)
+                to_check.append(dep_id)  # Check if this dependent has its own dependents
+
+    return list(all_dependents)
+
+
 def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]:
     """Navigate through template directories with enhanced UX and dependency management."""
     current_path = base_path
@@ -130,10 +153,10 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
 
             if template.id in selected_template_ids:
                 # User wants to deselect - check for dependents
-                dependents = find_dependents(template.id, all_templates, selected_template_ids)
+                dependents = find_all_dependents_recursive(template.id, all_templates, selected_template_ids)
 
-                if dependents and not run_mode:
-                    # Show warning about dependents
+                if dependents and run_mode:
+                    # Show warning about dependents only in run mode (--disable-dependencies)
                     dependent_names = [all_templates[dep_id].label for dep_id in dependents if dep_id in all_templates]
                     console.print(f"\n[yellow]Warning: The following templates depend on '{template.label}':[/yellow]")
                     for dep_name in dependent_names:
@@ -152,17 +175,72 @@ def navigate_templates(base_path: str, run_mode: bool = False) -> List[Template]
                                 selected_template_ids.remove(dep_id)
                     # If not confirmed, do nothing (keep the template selected)
                 else:
-                    # In run mode or no dependents, just remove
+                    # Normal mode: automatically remove dependents without prompting
                     selected_template_ids.remove(template.id)
-                    if dependents and run_mode:
-                        # Also remove dependents in run mode
+
+                    # Also remove all dependents automatically
+                    if dependents:
                         for dep_id in dependents:
                             if dep_id in selected_template_ids:
                                 selected_template_ids.remove(dep_id)
+
+            elif template.id in auto_selected_ids:
+                # User is trying to deselect an auto-selected dependency
+                if run_mode:
+                    # In run mode (--disable-dependencies), allow deselecting auto-selected dependencies
+                    # but show warning about potential issues
+                    manually_selected_dependents = []
+                    for selected_id in selected_template_ids:
+                        if selected_id in all_templates:
+                            selected_template = all_templates[selected_id]
+                            # Check if this manually selected template requires the one being deselected
+                            all_deps, _ = resolve_dependencies([selected_id], all_templates)
+                            if template.id in all_deps and template.id != selected_id:
+                                manually_selected_dependents.append(selected_id)
+
+                    if manually_selected_dependents:
+                        dependent_names = [all_templates[dep_id].label for dep_id in manually_selected_dependents]
+                        console.print(
+                            f"\n[red]Warning: Removing dependency '{template.label}' may cause issues with:[/red]")
+                        for dep_name in dependent_names:
+                            console.print(f"  - {dep_name}")
+
+                        confirm = questionary.confirm(
+                            "Continue anyway? This may cause template conflicts.",
+                            default=False
+                        ).ask()
+
+                        if confirm:
+                            console.print(
+                                f"[red]Note: '{template.label}' will be removed. Use caution.[/red]")
+                            questionary.press_any_key_to_continue("Press any key to continue...").ask()
+                            auto_selected_ids.remove(template.id)
+                            selected_templates.remove(template)
+                else:
+                    # Normal mode: prevent deselection of auto-selected dependencies
+                    manually_selected_dependents = []
+                    for selected_id in selected_template_ids:
+                        if selected_id in all_templates:
+                            selected_template = all_templates[selected_id]
+                            # Check if this manually selected template requires the one being deselected
+                            all_deps, _ = resolve_dependencies([selected_id], all_templates)
+                            if template.id in all_deps and template.id != selected_id:
+                                manually_selected_dependents.append(selected_id)
+
+                    if manually_selected_dependents:
+                        dependent_names = [all_templates[dep_id].label for dep_id in manually_selected_dependents]
+                        console.print(f"\n[yellow]Cannot deselect '{template.label}' as it's required by:[/yellow]")
+                        for dep_name in dependent_names:
+                            console.print(f"  - {dep_name}")
+                        console.print(
+                            "[yellow]Deselect those templates first if you want to remove this dependency.[/yellow]")
+
+                        # Wait for user acknowledgment
+                        questionary.press_any_key_to_continue("Press any key to continue...").ask()
+
             else:
-                # User wants to select - add if not auto-selected
-                if template.id not in auto_selected_ids:
-                    selected_template_ids.append(template.id)
+                # User wants to select a template that's not currently selected
+                selected_template_ids.append(template.id)
 
         elif action == "navigate":
             # Navigate to subdirectory
