@@ -218,13 +218,11 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
             border_style="green",
             padding=(1, 2)
         ))
+    if minimal_ui:
+        print("From here on you will exit --minimal-ui mode")
+    else:
         print("=" * 50)
-        if minimal_ui:
-            input("Press Any key to continue...")
-            print("From here on you will exit --minimal-ui mode")
-        else:
-            questionary.press_any_key_to_continue("Press any key to continue to project generation...").ask()
-        boilergen.builder.output_selection.ask_for_output_location(selected_templates)
+    boilergen.builder.output_selection.ask_for_output_location(selected_templates)
 
 
 def build_directory_tree(template_dir: str, base_path: str, minimal_ui: bool = False) -> str:

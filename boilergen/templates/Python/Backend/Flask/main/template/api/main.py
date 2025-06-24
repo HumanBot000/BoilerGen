@@ -8,5 +8,5 @@ app = Flask(__name__)
 # boilergen:init>>
 
 # <<boilergen:main
-app.run(host='0.0.0.0', port=int("boilergen:config | port"), debug=debug)
+app.run(host='boilergen:config | host | "0.0.0.0"', port=int("boilergen:config | port"), debug=debug)
 # boilergen:main>>

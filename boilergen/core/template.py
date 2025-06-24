@@ -9,7 +9,7 @@ class Template:
         self.label = label
         self.requires = requires or []
         self.config = config or {}
-        self.path = ""  # Will be set when loading from filesystem
+        self.path = ""
         self.auto_selected = False  # Flag to track if this was auto-selected as dependency
 
     @classmethod
