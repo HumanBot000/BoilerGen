@@ -3,7 +3,7 @@ import os
 import questionary
 import typer
 from typing import List
-import boilergen.builder.create_project
+import boilergen.builder.project_setup
 import boilergen.core.template
 
 

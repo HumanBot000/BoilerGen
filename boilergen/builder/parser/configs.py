@@ -1,6 +1,6 @@
+# todo The regex and quote detection was written entirely by AI, seems to work but unit tests are top priority
 import re
 from typing import Union
-import yaml
 
 
 class NotDefinedType:
@@ -107,6 +107,7 @@ def fetch_yaml_configs(configs: list[ValueConfig], yaml_data: dict):
     for config in configs:
         if config.identifier in yaml_data["config"]:
             config.yaml_value = yaml_data["config"][config.identifier]
+
 
 def interpret_value(raw: Union[str, None, NotDefinedType], outer_quote: Union[str, None]) -> ValueType:
     """
