@@ -1,15 +1,18 @@
+import itertools
 import os
 from pathlib import Path
 
 import typer
 from rich.panel import Panel
+from rich.text import Text
 
 from boilergen.cli.run_config import RunConfig
-from boilergen.core.display import display_final_selection, build_directory_tree, console
+from boilergen.core.display import display_final_selection, console
 from boilergen.core.navigator import navigate_templates
 
 app = typer.Typer(help="🔍 Navigate and select templates from your directory structure")
 DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(), "boilergen", "templates")
+RAINBOW_COLORS = ["red", "yellow", "green", "cyan", "blue", "magenta"]
 
 
 @app.command()
@@ -34,11 +37,17 @@ def create(
             "--clear-output",
             help="Clear the output directory before generating the project (Deletes existing data!)"
         ),
-        party_mode: bool = typer.Option(
+        party_mode: bool = typer.Option(  # todo hide from --help
             False,
             "--fiesta",
 
-        )  # todo hide from --help
+        ),
+        disable_quote_parsing: bool = typer.Option(
+            False,
+            "--disable-quote-parsing",
+            help="""By default if there is an " or ' before and after a config value we remove it in the generated project to make type parsing of boilergen configs easier."""
+        ),
+
 ):
     """
     🚀 Create a new project by selecting templates interactively.
@@ -61,7 +70,8 @@ def create(
         disable_dependencies=disable_dependencies,
         minimal_ui=minimal_ui,
         clear_output=clear_output,
-        party_mode=party_mode
+        party_mode=party_mode,
+        disable_quote_parsing_for_configs=disable_quote_parsing
     )
     try:
         selected_templates = navigate_templates(
@@ -94,6 +104,32 @@ def create(
         raise typer.Exit(0)
 
 
+def generate_simple_tree_text(path: str, prefix="") -> str:
+    try:
+        entries = sorted(os.listdir(path))
+    except PermissionError:
+        return prefix + "[Permission Denied]\n"
+
+    tree_lines = []
+
+    filtered_entries = [e for e in entries if e != "template" and e != "template.yaml"]
+
+    for i, entry in enumerate(filtered_entries):
+        full_path = os.path.join(path, entry)
+        connector = "└── " if i == len(filtered_entries) - 1 else "├── "
+
+        if os.path.isdir(full_path):
+            tree_lines.append(prefix + connector + f"📂 {entry}")
+            extension = "    " if i == len(filtered_entries) - 1 else "│   "
+            subtree = generate_simple_tree_text(full_path, prefix + extension)
+            if subtree:
+                tree_lines.extend(subtree.splitlines())
+        else:
+            tree_lines.append(prefix + connector + f"📄 {entry}")
+
+    return "\n".join(tree_lines)
+
+
 @app.command()
 def templates(
         template_dir: Path = typer.Argument(
@@ -105,12 +141,18 @@ def templates(
             False,
             "--minimal-ui",
             help="Disable colors and advanced formatting for basic terminal compatibility"
+        ),
+        party_mode: bool = typer.Option(
+            False,
+            "--fiesta",
+            help="Display each character in rainbow colors (for fun)"
         )
 ):
     """
     🌳 Display a tree view of all available templates.
     """
     template_dir = str(template_dir)
+
     if not os.path.exists(template_dir):
         if minimal_ui:
             print(f"Error: Template directory '{template_dir}' does not exist.")
@@ -118,16 +160,38 @@ def templates(
             console.print(f"[red]Error: Template directory '{template_dir}' does not exist.[/red]")
         raise typer.Exit(1)
 
-    tree_root = build_directory_tree(template_dir, template_dir, minimal_ui=minimal_ui)
+    if minimal_ui and party_mode:
+        warning_msg = "[yellow]Warning: --minimal-ui disables colors; fiesta mode will be ignored.[/yellow]"
+        console.print(warning_msg)
+        party_mode = False
 
-    if minimal_ui:
-        print("Template Directory Structure:")
-        print("=" * 40)
-        print(tree_root)
-    else:
+    if party_mode:
+        tree_text = generate_simple_tree_text(template_dir)
+        rainbow_text = Text()
+        color_cycle = itertools.cycle(RAINBOW_COLORS)
+        for char in tree_text:
+            if char.strip():
+                rainbow_text.append(char, style=next(color_cycle))
+            else:
+                rainbow_text.append(char)
         console.print(Panel(
-            tree_root,
-            title="Template Directory Structure",
-            border_style="blue",
+            rainbow_text,
+            title="🎉 Template Directory Structure (Fiesta Mode)",
+            border_style="bold magenta",
             padding=(1, 2)
         ))
+    else:
+        from boilergen.core.display import build_directory_tree
+        tree_root = build_directory_tree(template_dir, template_dir, minimal_ui=minimal_ui)
+
+        if minimal_ui:
+            print("Template Directory Structure:")
+            print("=" * 40)
+            print(tree_root)
+        else:
+            console.print(Panel(
+                tree_root,
+                title="Template Directory Structure",
+                border_style="blue",
+                padding=(1, 2)
+            ))

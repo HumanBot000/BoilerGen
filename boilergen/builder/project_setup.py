@@ -196,6 +196,6 @@ def create_project(output_path: str, selected_templates: List[Template], run_con
     template_files = prepare_objects(output_path, selected_templates, run_config)
     interactive_config_editor(template_files)
     for file in rainbow_tqdm.tqdm(template_files) if run_config.party_mode else tqdm.tqdm(template_files):
-        generate_file(file)
+        generate_file(file,run_config)
         if run_config.party_mode:
             time.sleep(0.1)
