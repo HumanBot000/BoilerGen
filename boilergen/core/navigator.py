@@ -39,9 +39,11 @@ def find_all_dependents_recursive(template_id: str, all_templates: Dict[str, Tem
     return list(all_dependents)
 
 
-def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False, minimal_ui: bool = False) -> List[
+def navigate_templates(base_path: str, run_config) -> List[
     Template]:
     """Navigate through template directories with enhanced UX and dependency management."""
+    minimal_ui = run_config.minimal_ui
+    dependencies_disabled = run_config.disable_dependencies
     current_path = base_path
     selected_template_ids = []
     excluded_template_ids = []  # Track templates user explicitly excluded in --disable-dependencies mode
@@ -63,14 +65,14 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False, 
         all_required_ids, auto_selected_ids = resolve_dependencies(selected_template_ids, all_templates)
 
         # In --disable-dependencies mode, filter out explicitly excluded templates
-        if dependencie_disabled_mode:
+        if dependencies_disabled:
             all_required_ids = [tid for tid in all_required_ids if tid not in excluded_template_ids]
             auto_selected_ids = [tid for tid in auto_selected_ids if tid not in excluded_template_ids]
 
         selected_templates = [all_templates[tid] for tid in all_required_ids if tid in all_templates]
 
         # Show current selection
-        display_current_selection(selected_templates, auto_selected_ids, all_templates, dependencie_disabled_mode,
+        display_current_selection(selected_templates, auto_selected_ids, all_templates, dependencies_disabled,
                                   minimal_ui)
 
         if minimal_ui:
@@ -195,7 +197,7 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False, 
                 # User wants to deselect - check for dependents
                 dependents = find_all_dependents_recursive(template.id, all_templates, selected_template_ids)
 
-                if dependents and dependencie_disabled_mode:
+                if dependents and dependencies_disabled:
                     # Show warning about dependents only in --disable-dependencies mode
                     dependent_names = [all_templates[dep_id].label for dep_id in dependents if dep_id in all_templates]
 
@@ -233,7 +235,7 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False, 
 
             elif template.id in auto_selected_ids:
                 # User is trying to deselect an auto-selected dependency
-                if dependencie_disabled_mode:
+                if dependencies_disabled:
                     # In --disable-dependencies, allow deselecting auto-selected dependencies
                     # but show warning about potential issues
                     manually_selected_dependents = []
@@ -325,7 +327,7 @@ def navigate_templates(base_path: str, dependencie_disabled_mode: bool = False, 
     final_required_ids, _ = resolve_dependencies(selected_template_ids, all_templates)
 
     # In --disable-dependencies mode, filter out explicitly excluded templates from final result
-    if dependencie_disabled_mode:
+    if dependencies_disabled:
         final_required_ids = [tid for tid in final_required_ids if tid not in excluded_template_ids]
 
     return [all_templates[tid] for tid in final_required_ids if tid in all_templates]

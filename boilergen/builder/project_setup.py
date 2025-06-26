@@ -1,8 +1,11 @@
 import collections
 import os
+import time
 from typing import List, Dict
-from tqdm import tqdm
+
 import questionary
+import rainbow_tqdm
+import tqdm
 import yaml
 from prompt_toolkit import Application
 from prompt_toolkit.key_binding import KeyBindings
@@ -11,27 +14,39 @@ from prompt_toolkit.layout.containers import HSplit
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import TextArea, Label
 
+from boilergen.builder.generation_logic import generate_file
 from boilergen.builder.parser.configs import extract_configs, fetch_yaml_configs, NOT_DEFINED
 from boilergen.builder.parser.tags import TemplateFile, extract_tags
 from boilergen.core.template import Template
 from ..cli import clear_shell
-from boilergen.builder.generation_logic import  generate_file
+from ..cli.run_config import RunConfig
 
-def sort_templates_by_dependencies(templates: List[Template]) -> List[Template]:
+
+def sort_templates_by_dependencies(
+        templates: List[Template],
+        strict: bool = True
+) -> List[Template]:
     """
-    Sorts a list of templates based on their dependencies. It guarantees that dependent templates are used after the creation of base templates.
+    Sorts templates topologically based on declared dependencies.
+    If strict is False (expert mode), missing dependencies are ignored.
     """
     id_map: Dict[str, Template] = {t.id: t for t in templates}
     graph: Dict[str, List[str]] = {t.id: [] for t in templates}
     in_degree: Dict[str, int] = {t.id: 0 for t in templates}
+
     for t in templates:
         for dep in t.requires:
             if dep not in graph:
-                raise ValueError(f"Missing dependency '{dep}' required by template '{t.id}'")
+                if strict:
+                    raise ValueError(f"Missing dependency '{dep}' required by template '{t.id}'")
+                else:
+                    continue
             graph[dep].append(t.id)
             in_degree[t.id] += 1
+
     queue = collections.deque([tid for tid, degree in in_degree.items() if degree == 0])
     sorted_ids = []
+
     while queue:
         current = queue.popleft()
         sorted_ids.append(current)
@@ -39,15 +54,17 @@ def sort_templates_by_dependencies(templates: List[Template]) -> List[Template]:
             in_degree[neighbor] -= 1
             if in_degree[neighbor] == 0:
                 queue.append(neighbor)
+
     if len(sorted_ids) != len(templates):
         raise ValueError("Cyclic dependency detected among templates")
+
     return [id_map[tid] for tid in sorted_ids]
 
 
-def prepare_objects(output_path: str, selected_templates: List[Template]):
+def prepare_objects(output_path: str, selected_templates: List[Template], run_config: RunConfig):
     template_files = []
 
-    for template in sort_templates_by_dependencies(selected_templates):
+    for template in sort_templates_by_dependencies(selected_templates, not run_config.disable_dependencies):
         yaml_path = os.path.join(template.path, "template.yaml")
         if not os.path.isfile(yaml_path):
             raise FileNotFoundError(f"'template.yaml' not found in template: {template.path}")
@@ -172,11 +189,13 @@ def interactive_config_editor(template_files: List[TemplateFile]):
                     raise ValueError(f"Missing config value for key '{config.identifier}'")
 
 
-def create_project(output_path: str, selected_templates: List[Template]):
+def create_project(output_path: str, selected_templates: List[Template], run_config: RunConfig):
     clear_shell()
     questionary.press_any_key_to_continue(
         "We will now step through the templates to generate your boilerplate project. Press any key to continue...").ask()
-    template_files = prepare_objects(output_path, selected_templates)
+    template_files = prepare_objects(output_path, selected_templates, run_config)
     interactive_config_editor(template_files)
-    for file in tqdm(template_files): #todo https://github.com/bgorlick/rainbow_tqdm
+    for file in rainbow_tqdm.tqdm(template_files) if run_config.party_mode else tqdm.tqdm(template_files):
         generate_file(file)
+        if run_config.party_mode:
+            time.sleep(0.1)

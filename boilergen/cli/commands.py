@@ -1,10 +1,12 @@
 import os
+from pathlib import Path
+
 import typer
 from rich.panel import Panel
-from pathlib import Path
-from boilergen.core.navigator import navigate_templates
+
+from boilergen.cli.run_config import RunConfig
 from boilergen.core.display import display_final_selection, build_directory_tree, console
-from boilergen.core.template_finder import find_all_templates, resolve_dependencies
+from boilergen.core.navigator import navigate_templates
 
 app = typer.Typer(help="🔍 Navigate and select templates from your directory structure")
 DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(), "boilergen", "templates")
@@ -12,7 +14,7 @@ DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(), "boilergen", "templates")
 
 @app.command()
 def create(
-        template_dir: Path = typer.Argument(
+        template_dir: str = typer.Argument(
             default=DEFAULT_TEMPLATE_DIR,
             help="Path to the template root directory",
             file_okay=False
@@ -26,7 +28,17 @@ def create(
             False,
             "--minimal-ui",
             help="Disable colors and advanced formatting for basic terminal compatibility"
-        )
+        ),
+        clear_output: bool = typer.Option(
+            False,
+            "--clear-output",
+            help="Clear the output directory before generating the project (Deletes existing data!)"
+        ),
+        party_mode: bool = typer.Option(
+            False,
+            "--fiesta",
+
+        )  # todo hide from --help
 ):
     """
     🚀 Create a new project by selecting templates interactively.
@@ -45,11 +57,16 @@ def create(
             console.print(f"[red]Error: '{template_dir}' is not a directory.[/red]")
         raise typer.Exit(1)
 
+    config = RunConfig(
+        disable_dependencies=disable_dependencies,
+        minimal_ui=minimal_ui,
+        clear_output=clear_output,
+        party_mode=party_mode
+    )
     try:
         selected_templates = navigate_templates(
             template_dir,
-            dependencie_disabled_mode=disable_dependencies,
-            minimal_ui=minimal_ui
+            config
         )
 
         manually_selected_ids = []  # We don't track this separately in the current implementation
@@ -66,8 +83,7 @@ def create(
             selected_templates,
             template_dir,
             auto_selected_ids,
-            run_mode=disable_dependencies,
-            minimal_ui=minimal_ui
+            config
         )
 
     except KeyboardInterrupt:

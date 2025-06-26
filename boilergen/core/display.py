@@ -69,10 +69,9 @@ def display_current_selection(selected_templates: List[Template], auto_selected_
 
 
 def display_final_selection(selected_templates: List[Template], base_path: str,
-                            auto_selected_ids: List[str], run_mode: bool = False, minimal_ui: bool = False):
+                            auto_selected_ids: List[str], run_config):
     """Display the final selection in a nice format."""
     clear_shell()
-
     if not selected_templates:
         if minimal_ui:
             print("\n" + "=" * 50)
@@ -88,7 +87,7 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
             ))
         return
 
-    if minimal_ui:
+    if run_config.minimal_ui:
         print("\n" + "=" * 50)
         print(f"SELECTION COMPLETE - {len(selected_templates)} template(s) selected")
         print("=" * 50)
@@ -119,9 +118,8 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
                 if template.id in auto_selected_ids:
                     suffix += " *"
 
-                # Check for missing dependencies in --disable-dependencies mode
                 missing_deps = []
-                if run_mode:
+                if run_config.disable_dependencies:
                     for dep_id in template.requires:
                         if dep_id not in [t.id for t in selected_templates]:
                             missing_deps.append(dep_id)
@@ -135,7 +133,7 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
         legend_parts = []
         if auto_selected_ids:
             legend_parts.append("* = Auto-selected dependency")
-        if run_mode:
+        if run_config.disable_dependencies:
             legend_parts.append("WARNING = Missing dependencies (--disable-dependencies)")
 
         if legend_parts:
@@ -180,7 +178,7 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
 
                 # Check for missing dependencies in --disable-dependencies mode
                 missing_deps = []
-                if run_mode:
+                if run_config.disable_dependencies:
                     for dep_id in template.requires:
                         if dep_id not in [t.id for t in selected_templates]:
                             missing_deps.append(dep_id)
@@ -197,7 +195,7 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
         legend_parts = []
         if auto_selected_ids:
             legend_parts.append("* = Auto-selected dependency")
-        if run_mode:
+        if run_config.disable_dependencies:
             legend_parts.append("⚠️ = Missing dependencies (--disable-dependencies)")
 
         title = f"✅ Selection Complete - {len(selected_templates)} template(s) selected"
@@ -218,11 +216,11 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
             border_style="green",
             padding=(1, 2)
         ))
-    if minimal_ui:
+    if run_config.minimal_ui:
         print("From here on you will exit --minimal-ui mode")
     else:
         print("=" * 50)
-    boilergen.builder.output_selection.ask_for_output_location(selected_templates)
+    boilergen.builder.output_selection.ask_for_output_location(selected_templates,run_config)
 
 
 def build_directory_tree(template_dir: str, base_path: str, minimal_ui: bool = False) -> str:
