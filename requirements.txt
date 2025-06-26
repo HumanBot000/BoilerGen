@@ -1,0 +1,8 @@
+typer==0.16.0
+rich==14.0.0
+boilergen==0.1.0
+questionary==2.1.0
+PyYAML==6.0.2
+rainbow_tqdm==0.1.5
+tqdm==4.67.1
+prompt_toolkit==3.0.51

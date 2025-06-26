@@ -10,7 +10,8 @@ from boilergen.cli.run_config import RunConfig
 from boilergen.core.display import display_final_selection, console
 from boilergen.core.navigator import navigate_templates
 
-app = typer.Typer(help="🔍 Navigate and select templates from your directory structure")
+app = typer.Typer(help="🔍 Navigate and select templates from your directory structure", no_args_is_help=True,
+                  pretty_exceptions_enable=False, add_completion=False)
 DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(), "boilergen", "templates")
 RAINBOW_COLORS = ["red", "yellow", "green", "cyan", "blue", "magenta"]
 
