@@ -3,7 +3,7 @@ import os
 import questionary
 import typer
 from typing import List
-import boilergen.builder.project_setup
+from boilergen.builder.project_setup import create_project
 import boilergen.core.template
 
 
@@ -23,4 +23,4 @@ def ask_for_output_location(selected_templates: List[boilergen.core.template.Tem
             f"Output directory '{output_selection}' does not exist. Do you want to create it?"
         ):
             os.makedirs(output_selection, exist_ok=True)
-    boilergen.builder.create_project.create_project(output_selection,selected_templates)
+    create_project(output_selection,selected_templates)

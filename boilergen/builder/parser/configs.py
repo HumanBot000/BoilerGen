@@ -46,7 +46,7 @@ def extract_configs(file_content: str):
         r'boilergen:config\s*\|\s*'
         r'([^\s|]+)'  # identifier
         r'(?:\s*\|\s*'
-        r'([^"\']*(?:"[^"]*"|\'[^\']*\'[^"\']*)*)'  # value that may contain quoted strings
+        r'([^"\']*(?:"[^"]*"|\'[^\']*\'[^"\']*)*)'  # optional value (may contain quoted parts)
         r')?'
     )
 
@@ -54,8 +54,6 @@ def extract_configs(file_content: str):
     configs = []
 
     for line_number, line in enumerate(file_content.splitlines(keepends=True), start=1):
-        # Let's debug by showing what we're trying to match
-        # Find outer quotes first
         in_quotes = []
         i = 0
         while i < len(line):
@@ -63,32 +61,27 @@ def extract_configs(file_content: str):
                 quote_char = line[i]
                 start_quote = i
                 i += 1
-                # Find end quote
                 while i < len(line) and line[i] != quote_char:
-                    if line[i] == '\\':  # Skip escaped characters
+                    if line[i] == '\\':
                         i += 2
                     else:
                         i += 1
-                if i < len(line):  # Found closing quote
+                if i < len(line):
                     in_quotes.append((start_quote, i, quote_char, line[start_quote:i + 1]))
                 i += 1
             else:
                 i += 1
 
-        # Now look for boilergen:config patterns within quotes
+        # 1. Matches **within quotes** (current logic)
         for start_quote, end_quote, quote_char, quoted_content in in_quotes:
-            inner_content = quoted_content[1:-1]  # Remove outer quotes
-            matches = list(full_pattern.finditer(inner_content))
-
-            for m in matches:
-                # Adjust positions to account for the quote offset
+            inner_content = quoted_content[1:-1]
+            for m in full_pattern.finditer(inner_content):
                 match_start = offset + start_quote + 1 + m.start()
                 match_end = offset + start_quote + 1 + m.end()
-
                 identifier = m.group(1).strip()
                 raw_value = m.group(2).strip() if m.group(2) is not None else None
-
                 interpreted_value = interpret_value(raw_value, quote_char)
+
                 config = ValueConfig(
                     identifier=identifier,
                     replacement_start=match_start,
@@ -98,15 +91,42 @@ def extract_configs(file_content: str):
                     cli_value=NOT_DEFINED
                 )
                 configs.append(config)
+
+        # 2. Matches **outside of quotes**
+        quote_ranges = [(s, e) for s, e, *_ in in_quotes]
+
+        def is_outside_quotes(pos):
+            return not any(start <= pos < end + 1 for start, end in quote_ranges)
+
+        for m in full_pattern.finditer(line):
+            if is_outside_quotes(m.start()):
+                match_start = offset + m.start()
+                match_end = offset + m.end()
+                identifier = m.group(1).strip()
+                raw_value = m.group(2).strip() if m.group(2) is not None else None
+                interpreted_value = interpret_value(raw_value, None)
+
+                config = ValueConfig(
+                    identifier=identifier,
+                    replacement_start=match_start,
+                    replacement_end=match_end,
+                    in_template_value=interpreted_value,
+                    yaml_value=NOT_DEFINED,
+                    cli_value=NOT_DEFINED
+                )
+                configs.append(config)
+
         offset += len(line)
 
     return configs
 
 
+
 def fetch_yaml_configs(configs: list[ValueConfig], yaml_data: dict):
     for config in configs:
-        if config.identifier in yaml_data["config"]:
-            config.yaml_value = yaml_data["config"][config.identifier]
+        if isinstance(yaml_data, dict) and "config" in yaml_data:
+            if config.identifier in yaml_data["config"]:
+                config.yaml_value = yaml_data["config"][config.identifier]
 
 
 def interpret_value(raw: Union[str, None, NotDefinedType], outer_quote: Union[str, None]) -> ValueType:

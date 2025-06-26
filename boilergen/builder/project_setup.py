@@ -1,7 +1,7 @@
 import collections
 import os
 from typing import List, Dict
-
+from tqdm import tqdm
 import questionary
 import yaml
 from prompt_toolkit import Application
@@ -15,7 +15,7 @@ from boilergen.builder.parser.configs import extract_configs, fetch_yaml_configs
 from boilergen.builder.parser.tags import TemplateFile, extract_tags
 from boilergen.core.template import Template
 from ..cli import clear_shell
-
+from boilergen.builder.generation_logic import  generate_file
 
 def sort_templates_by_dependencies(templates: List[Template]) -> List[Template]:
     """
@@ -59,14 +59,12 @@ def prepare_objects(output_path: str, selected_templates: List[Template]):
             for file in files:
                 if file == "template.yaml":
                     continue
-
                 relative_parts = os.path.relpath(root, template.path).split(os.sep, maxsplit=1)[1:]  # strip template/
                 abstracted_path = os.path.join(*relative_parts) if relative_parts else ""
                 full_path = os.path.join(root, file)
 
                 with open(full_path, "r") as f:
                     content = f.read()
-
                 template_file = TemplateFile(
                     content,
                     extract_tags(content),
@@ -179,3 +177,6 @@ def create_project(output_path: str, selected_templates: List[Template]):
     questionary.press_any_key_to_continue(
         "We will now step through the templates to generate your boilerplate project. Press any key to continue...").ask()
     template_files = prepare_objects(output_path, selected_templates)
+    interactive_config_editor(template_files)
+    for file in tqdm(template_files): #todo https://github.com/bgorlick/rainbow_tqdm
+        generate_file(file)
