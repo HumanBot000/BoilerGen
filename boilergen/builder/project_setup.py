@@ -74,9 +74,7 @@ def prepare_objects(output_path: str, selected_templates: List[Template], run_co
             yaml_data = yaml.safe_load(f)
 
         injections_folder = os.path.join(template.path, "injections;")
-
         for root, dirs, files in os.walk(template.path):
-            # Skip walking into 'injections;' directory
             dirs[:] = [d for d in dirs if os.path.join(root, d) != injections_folder]
 
             for file in files:
@@ -93,7 +91,6 @@ def prepare_objects(output_path: str, selected_templates: List[Template], run_co
 
                 with open(full_path, "r") as f:
                     content = f.read()
-
                 template_file = TemplateFile(
                     content,
                     extract_tags(content),

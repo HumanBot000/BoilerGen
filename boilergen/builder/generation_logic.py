@@ -19,10 +19,15 @@ def generate_file(file: TemplateFile, run_config: boilergen.cli.run_config.RunCo
 
     lines = text.splitlines()
     # Tag removal
-    for tag in file.tags:
-        # todo run arg to remove the line instead of clearing (We need to keep track of everything because line count get's updated)
+    for index,tag in enumerate(sorted(file.tags, key=lambda t: t.line_start, reverse=True)):
         lines[tag.line_start - 1] = ""
         lines[tag.line_end - 1] = ""
+        """del lines[tag.line_start]
+        del lines[tag.line_end-1]
+        for other_tag in sorted(file.tags, key=lambda t: t.line_start, reverse=True)[index:]:
+            other_tag.line_start -= 2
+            other_tag.line_end -= 2
+        """
     text = "\n".join(lines)
     os.makedirs(os.path.dirname(file.destination_path), exist_ok=True)
     with open(file.destination_path,"w+") as f:

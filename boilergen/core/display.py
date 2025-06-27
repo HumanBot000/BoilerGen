@@ -73,7 +73,7 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
     """Display the final selection in a nice format."""
     clear_shell()
     if not selected_templates:
-        if minimal_ui:
+        if run_config.minimal_ui:
             print("\n" + "=" * 50)
             print("SELECTION COMPLETE")
             print("=" * 50)

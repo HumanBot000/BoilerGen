@@ -15,7 +15,8 @@ class InjectionMethod(Enum):
 
 
 class Injection:
-    def __init__(self, target_template_name: str, target_file: str, source_file: str, injection_definition_location: str,
+    def __init__(self, target_template_name: str, target_file: str, source_file: str,
+                 injection_definition_location: str,
                  target_tag: Union[str, None] = None, line: Union[int, None] = None,
                  method: InjectionMethod = InjectionMethod.END):
         if target_tag is None and line is None:
@@ -53,7 +54,7 @@ class Injection:
         ))
 
 
-def parse_injections(yaml_data: dict,yaml_file_path: str) -> list[Injection]:
+def parse_injections(yaml_data: dict, yaml_file_path: str) -> list[Injection]:
     injections = []
     for injection in yaml_data.get("injections", []):
         if injection.get("method") == "replace":
@@ -87,18 +88,16 @@ def run_injections(template_files: List[TemplateFile], run_config: RunConfig, ou
     visited_injections = set()
 
     for file in template_files:
-        for injection in file.injections:
+        for index, injection in enumerate(file.injections):
             if injection in visited_injections:
                 continue
             visited_injections.add(injection)
-
             full_destination_path = os.path.join(output_path, injection.target_file)
             source_template = get_template_file_to_injection(template_files, injection, output_path)
 
             with open(full_destination_path, "r") as f:
                 content_lines = f.read().splitlines()
-
-            with open(os.path.join(injection.injection_definition_location,injection.source_file), "r") as f:
+            with open(os.path.join(injection.injection_definition_location, injection.source_file), "r") as f:
                 source_lines = f.read().splitlines()
 
             def find_tag_bounds():
@@ -107,42 +106,58 @@ def run_injections(template_files: List[TemplateFile], run_config: RunConfig, ou
                         return tag.line_start, tag.line_end
                 return None, None
 
+            if index == 0:
+                edited_content_lines = content_lines.copy()
             method = injection.method
 
             if method == InjectionMethod.REPLACE:
                 if injection.line is not None:
-                    content_lines[injection.line:injection.line + 1] = source_lines
+                    file_length_line_delta = len(edited_content_lines[injection.line:injection.line + 1]) - len(source_lines)
+                    edited_content_lines[injection.line:injection.line + 1] = source_lines
                 else:
                     start, end = find_tag_bounds()
                     if start is not None and end is not None:
-                        content_lines[start:end] = source_lines
+                        file_length_line_delta = len(edited_content_lines[start:end]) - len(source_lines)
+                        edited_content_lines[start:end] = source_lines
 
             elif method == InjectionMethod.BEFORE:
+                file_length_line_delta = len(source_lines)
                 if injection.line is not None:
-                    content_lines[injection.line:injection.line] = source_lines
+                    edited_content_lines[injection.line:injection.line] = source_lines
                 else:
                     start, _ = find_tag_bounds()
                     if start is not None:
-                        content_lines[start:start] = source_lines
+                        edited_content_lines[start:start] = source_lines
 
             elif method == InjectionMethod.AFTER:
+                file_length_line_delta = len(source_lines)
                 if injection.line is not None:
-                    content_lines[injection.line + 1:injection.line + 1] = source_lines
+                    edited_content_lines[injection.line + 1:injection.line + 1] = source_lines
                 else:
                     _, end = find_tag_bounds()
                     if end is not None:
-                        content_lines[end + 1:end + 1] = source_lines
+                        edited_content_lines[end + 1:end + 1] = source_lines
 
             elif method == InjectionMethod.START:
+                file_length_line_delta = len(source_lines)
                 start, _ = find_tag_bounds()
                 if start is not None:
                     insert_pos = start + 1
-                    content_lines[insert_pos:insert_pos] = source_lines
+                    edited_content_lines[insert_pos:insert_pos] = source_lines
 
             elif method == InjectionMethod.END:
+                file_length_line_delta = len(source_lines)
                 _, end = find_tag_bounds()
                 if end is not None:
                     insert_pos = end
-                    content_lines[insert_pos:insert_pos] = source_lines
+                    edited_content_lines[insert_pos:insert_pos] = source_lines
 
-            print("\n".join(content_lines) + "\n")
+            start, end = find_tag_bounds()
+            for tag in file.tags:
+                if tag.line_start > start:
+                    tag.line_start += file_length_line_delta
+                if tag.line_end > end:
+                    tag.line_end += file_length_line_delta
+            if index == len(file.injections) - 1:
+                with open(full_destination_path, "w") as f:
+                    f.write("\n".join(edited_content_lines))
