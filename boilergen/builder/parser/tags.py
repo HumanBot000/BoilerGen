@@ -1,6 +1,8 @@
 import re
 from typing import List
+
 from boilergen.builder.parser.configs import ValueConfig
+
 TAG_OPENING_REGEX = r"<<boilergen:(?!config\b)[^>\s]+"
 TAG_CLOSING_REGEX = r"boilergen:(?!config\b)[^>\s]+>>"
 
@@ -16,11 +18,16 @@ class Tag:
 
 
 class TemplateFile:
-    def __init__(self, content: str, tags: List[Tag], configs: List[ValueConfig], destination_path: str):
+    def __init__(self, content: str, tags: List[Tag], configs: List[ValueConfig], destination_path: str,
+                 injections=None):
+        if injections is None:
+            injections = []
         self.content = content
         self.tags = tags
         self.configs = configs
         self.destination_path = destination_path
+        self.injections = injections
+
 
 def extract_tags(file_content: str):
     opening_tags = []

@@ -1,5 +1,5 @@
 injections:
-  - on: flask
+  - target: flask
     at:
       file: api/main.py
       tag: imports
@@ -7,9 +7,8 @@ injections:
       insert:
         - bottom
     from: imports.py
-    tag: "*"
 
-  - on: flask
+  - target: flask
     at:
       file: api/main.py
       tag: init
@@ -17,4 +16,3 @@ injections:
       insert:
         - bottom
     from: register_bp.py
-    tag: "*"

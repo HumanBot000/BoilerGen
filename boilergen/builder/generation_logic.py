@@ -27,3 +27,4 @@ def generate_file(file: TemplateFile, run_config: boilergen.cli.run_config.RunCo
     os.makedirs(os.path.dirname(file.destination_path), exist_ok=True)
     with open(file.destination_path,"w+") as f:
         f.write(text)
+

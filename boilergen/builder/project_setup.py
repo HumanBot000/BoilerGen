@@ -14,6 +14,7 @@ from prompt_toolkit.layout.containers import HSplit
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import TextArea, Label
 
+from boilergen.builder.parser.injections import parse_injections, run_injections
 from boilergen.builder.generation_logic import generate_file
 from boilergen.builder.parser.configs import extract_configs, fetch_yaml_configs, NOT_DEFINED
 from boilergen.builder.parser.tags import TemplateFile, extract_tags
@@ -72,16 +73,27 @@ def prepare_objects(output_path: str, selected_templates: List[Template], run_co
         with open(yaml_path, "r") as f:
             yaml_data = yaml.safe_load(f)
 
+        injections_folder = os.path.join(template.path, "injections;")
+
         for root, dirs, files in os.walk(template.path):
+            # Skip walking into 'injections;' directory
+            dirs[:] = [d for d in dirs if os.path.join(root, d) != injections_folder]
+
             for file in files:
                 if file == "template.yaml":
                     continue
+
+                full_path = os.path.join(root, file)
+
+                if os.path.commonpath([full_path, injections_folder]) == injections_folder:
+                    continue
+
                 relative_parts = os.path.relpath(root, template.path).split(os.sep, maxsplit=1)[1:]  # strip template/
                 abstracted_path = os.path.join(*relative_parts) if relative_parts else ""
-                full_path = os.path.join(root, file)
 
                 with open(full_path, "r") as f:
                     content = f.read()
+
                 template_file = TemplateFile(
                     content,
                     extract_tags(content),
@@ -90,6 +102,15 @@ def prepare_objects(output_path: str, selected_templates: List[Template], run_co
                 )
                 fetch_yaml_configs(template_file.configs, yaml_data)
                 template_files.append(template_file)
+
+        if os.path.isdir(injections_folder):
+            injections_yaml = os.path.join(injections_folder, "injections.yaml")
+            if os.path.isfile(injections_yaml):
+                with open(injections_yaml, "r") as f:
+                    injections_data = yaml.safe_load(f)
+                for tf in template_files:
+                    tf.injections = parse_injections(injections_data,f"{template.path}{os.sep}injections;{os.sep}injections.yaml")
+
     return template_files
 
 
@@ -199,3 +220,5 @@ def create_project(output_path: str, selected_templates: List[Template], run_con
         generate_file(file,run_config)
         if run_config.party_mode:
             time.sleep(0.1)
+    clear_shell()
+    run_injections(template_files, run_config, output_path)
