@@ -1,3 +1,4 @@
+import collections
 import os
 from enum import Enum
 from typing import Union, List
@@ -86,29 +87,50 @@ def get_template_file_to_injection(template_files: List[TemplateFile], injection
 
 def run_injections(template_files: List[TemplateFile], run_config: RunConfig, output_path: str):
     visited_injections = set()
+    injections_by_target_file = collections.defaultdict(list)
 
     for file in template_files:
-        for index, injection in enumerate(file.injections):
+        for injection in file.injections:
             if injection in visited_injections:
                 continue
             visited_injections.add(injection)
-            full_destination_path = os.path.join(output_path, injection.target_file)
-            source_template = get_template_file_to_injection(template_files, injection, output_path)
+            injections_by_target_file[injection.target_file].append((file, injection))
 
-            with open(full_destination_path, "r") as f:
-                content_lines = f.read().splitlines()
+    for target_file, injections in injections_by_target_file.items():
+        full_destination_path = os.path.join(output_path, target_file)
+
+        with open(full_destination_path, "r") as f:
+            content_lines = f.read().splitlines()
+        edited_content_lines = content_lines.copy()
+
+        def sort_key(pair):
+            _, injection = pair
+            if injection.line is not None:
+                return (0, injection.line)
+            else:
+                for file, inj in injections:
+                    if inj == injection:
+                        tags = get_template_file_to_injection(template_files, inj, output_path).tags
+                        for tag in tags:
+                            if str(tag.tag_identifier) == str(injection.target_tag):
+                                return (1, tag.line_start)
+            return (2, 0)  # Fallback
+
+        injections.sort(key=sort_key)
+
+        for file, injection in injections:
+            source_template = get_template_file_to_injection(template_files, injection, output_path)
             with open(os.path.join(injection.injection_definition_location, injection.source_file), "r") as f:
                 source_lines = f.read().splitlines()
 
             def find_tag_bounds():
                 for tag in source_template.tags:
-                    if tag.tag_identifier == injection.target_tag:
+                    if str(tag.tag_identifier) == str(injection.target_tag):
                         return tag.line_start, tag.line_end
                 return None, None
 
-            if index == 0:
-                edited_content_lines = content_lines.copy()
             method = injection.method
+            file_length_line_delta = 0
 
             if method == InjectionMethod.REPLACE:
                 if injection.line is not None:
@@ -154,10 +176,10 @@ def run_injections(template_files: List[TemplateFile], run_config: RunConfig, ou
 
             start, end = find_tag_bounds()
             for tag in file.tags:
-                if tag.line_start > start:
+                if start is not None and tag.line_start > start:
                     tag.line_start += file_length_line_delta
-                if tag.line_end > end:
+                if end is not None and tag.line_end > end:
                     tag.line_end += file_length_line_delta
-            if index == len(file.injections) - 1:
-                with open(full_destination_path, "w") as f:
-                    f.write("\n".join(edited_content_lines))
+
+        with open(full_destination_path, "w") as f:
+            f.write("\n".join(edited_content_lines))
