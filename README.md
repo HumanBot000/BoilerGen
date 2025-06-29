@@ -4,15 +4,12 @@ BoilerGen creates files from reusable templates and injects necessary code (e.g.
 
 No more manual integration steps. No more forgotten imports. Just working boilerplate.
 
-> 🚧 Work in progress: The project is currently not in a usable state. 
-
-
 ## Setup
 
 1. [Install Python (3.11+) and pip](https://realpython.com/installing-python/)
 2. Clone this repository using    `git clone https://github.com/HumanBot000/BoilerGen.git`
-3. Run `pip install -r requirements.txt`
-4. Open your preferred command line and `cd` into the project directory.
+3. Open your preferred command line and `cd` into the project directory.
+4. Run `pip install -r requirements.txt`
 5. Run `pip install -e .`
 6. [Set up your first templates](x)  
 7. Run `boilergen create` and follow the instructions.
@@ -121,7 +118,59 @@ stateDiagram-v2
     step1 --> step2
     step2 --> step3
 ```
+## Injections
+Injections are a way to specify insertion/editing operations to files of foreign Templates.
 
----
+### Defining Injections
+Injection definitions are located inside a special `injections;` folder at the parent level.
+```
+boilergen/
+├── templates/
+│   ├── base-template/
+│   │   ├── template.yaml
+│   │   └── template/
+│   │       └── api/
+│   │           └── test-file.txt
+│   └── test-template/
+│       ├── injections/
+│       │   ├── data-file1.txt
+│       │   ├── data-file2.txt
+│       │   └── injections.yaml
+│       ├── template/
+│       └── template.yaml
+```
 
+Generally you define injections in the extending template, not the base template. 
 
+#### injections.yaml
+This File lays out a structure on how the injection behaves.
+```yaml
+injections:  
+  - target: base
+    at:  
+      file: api/test-file.txt
+      tag: start
+    method:  
+      insert:  
+        - bottom  
+    from: data-file1.txt
+  
+  - target: base
+    at:  
+      file: api/test-file.txt
+      tag: main
+    method:  
+      replace:
+    from: data-file2.txt
+```
+This setup takes the whole content of `data-file1.txt` and inserts right before the closing definition of the "start" tag at `api/test-file.txt` inside the base template. It does the same for data-file2.txt but replaces the whole "main" section of the file.
+
+##### Fields
+| name      	| description                                                                          	| note                                                                       	| possible values           	|
+|-----------	|--------------------------------------------------------------------------------------	|----------------------------------------------------------------------------	|---------------------------	|
+| at        	| The relative path to the file to inject into                                         	| This must be defined inside the `requires` part of the template.yaml file. 	|                           	|
+| tag       	| The identifier of the tag to inject into                                             	| Can't be used alongside `line` in the same injection.                      	|                           	|
+| line      	| A single integer describing the line the injection affects                           	| Can't be used alongside `tag` in the same injection.                       	|                           	|
+| method    	| what to do with the current tag content                                              	|                                                                            	| insert, replace           	|
+| -> insert 	| Where to insert the new content                                                      	| Can only be used when method is `insert`                                   	| above, below, top, bottom 	|
+| from      	| The relative path to the file inside the injecting template to pull the content from 	|                                                                            	|                           	|

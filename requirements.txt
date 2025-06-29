@@ -1,6 +1,5 @@
 typer==0.16.0
 rich==14.0.0
-boilergen==0.1.0
 questionary==2.1.0
 PyYAML==6.0.2
 rainbow_tqdm==0.1.5
