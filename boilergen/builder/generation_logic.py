@@ -4,7 +4,7 @@ import boilergen.cli.run_config
 from boilergen.builder.parser.tags import TemplateFile
 
 
-def generate_file(file: TemplateFile, run_config: boilergen.cli.run_config.RunConfig):
+def generate_file_content_data(file: TemplateFile, run_config: boilergen.cli.run_config.RunConfig):
     text = file.content
     # Configs
     for config in sorted(file.configs, key=lambda c: c.replacement_start, reverse=True):
@@ -20,6 +20,7 @@ def generate_file(file: TemplateFile, run_config: boilergen.cli.run_config.RunCo
     lines = text.splitlines()
     # Tag removal
     for index,tag in enumerate(sorted(file.tags, key=lambda t: t.line_start, reverse=True)):
+        print(tag.line_end -1 , lines)
         lines[tag.line_start - 1] = ""
         lines[tag.line_end - 1] = ""
         """del lines[tag.line_start]
@@ -29,7 +30,6 @@ def generate_file(file: TemplateFile, run_config: boilergen.cli.run_config.RunCo
             other_tag.line_end -= 2
         """
     text = "\n".join(lines)
-    os.makedirs(os.path.dirname(file.destination_path), exist_ok=True)
-    with open(file.destination_path,"w+") as f:
-        f.write(text)
+    file.content = text
+
 

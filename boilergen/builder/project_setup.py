@@ -15,7 +15,7 @@ from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import TextArea, Label
 
 from boilergen.builder.parser.injections import parse_injections, run_injections
-from boilergen.builder.generation_logic import generate_file
+from boilergen.builder.generation_logic import generate_file_content_data
 from boilergen.builder.parser.configs import extract_configs, fetch_yaml_configs, NOT_DEFINED
 from boilergen.builder.parser.tags import TemplateFile, extract_tags
 from boilergen.core.template import Template
@@ -212,10 +212,14 @@ def create_project(output_path: str, selected_templates: List[Template], run_con
     questionary.press_any_key_to_continue(
         "We will now step through the templates to generate your boilerplate project. Press any key to continue...").ask()
     template_files = prepare_objects(output_path, selected_templates, run_config)
+    run_injections(template_files, run_config, output_path)
     interactive_config_editor(template_files)
     for file in rainbow_tqdm.tqdm(template_files) if run_config.party_mode else tqdm.tqdm(template_files):
-        generate_file(file,run_config)
+        generate_file_content_data(file, run_config)
         if run_config.party_mode:
             time.sleep(0.1)
     clear_shell()
-    run_injections(template_files, run_config, output_path)
+    for file in template_files:
+        os.makedirs(os.path.dirname(file.destination_path), exist_ok=True)
+        with open(file.destination_path, "w+") as f:
+            f.write(file.content)
