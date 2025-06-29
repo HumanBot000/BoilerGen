@@ -106,9 +106,30 @@ def prepare_objects(output_path: str, selected_templates: List[Template], run_co
                 with open(injections_yaml, "r") as f:
                     injections_data = yaml.safe_load(f)
                 for tf in template_files:
-                    tf.injections = parse_injections(injections_data,f"{template.path}{os.sep}injections;{os.sep}injections.yaml")
+                    tf.injections = parse_injections(injections_data,
+                                                     f"{template.path}{os.sep}injections;{os.sep}injections.yaml")
 
     return template_files
+
+
+def refresh_tags_and_configs_after_injections(template_files: List[TemplateFile]):
+    for file in template_files:
+        # Re-extract tags with updated line numbers
+        file.tags = extract_tags(file.content)
+
+        # Re-extract configs with updated positions
+        new_configs = extract_configs(file.content)
+
+        # Preserve the yaml_value and cli_value from the original configs
+        config_lookup = {config.identifier: config for config in file.configs}
+
+        for new_config in new_configs:
+            if new_config.identifier in config_lookup:
+                old_config = config_lookup[new_config.identifier]
+                new_config.yaml_value = old_config.yaml_value
+                new_config.cli_value = old_config.cli_value
+
+        file.configs = new_configs
 
 
 def cli_config_editor(current_config: dict, file_path: str) -> dict | None:
@@ -211,13 +232,17 @@ def create_project(output_path: str, selected_templates: List[Template], run_con
     clear_shell()
     questionary.press_any_key_to_continue(
         "We will now step through the templates to generate your boilerplate project. Press any key to continue...").ask()
+
     template_files = prepare_objects(output_path, selected_templates, run_config)
     run_injections(template_files, run_config, output_path)
+    refresh_tags_and_configs_after_injections(template_files) # The lines have updated significantly after injections and this is the easiest way
     interactive_config_editor(template_files)
+
     for file in rainbow_tqdm.tqdm(template_files) if run_config.party_mode else tqdm.tqdm(template_files):
         generate_file_content_data(file, run_config)
         if run_config.party_mode:
             time.sleep(0.1)
+
     clear_shell()
     for file in template_files:
         os.makedirs(os.path.dirname(file.destination_path), exist_ok=True)
