@@ -11,7 +11,7 @@ No more manual integration steps. No more forgotten imports. Just working boiler
 3. Open your preferred command line and `cd` into the project directory.
 4. Run `pip install -r requirements.txt`
 5. Run `pip install -e .`
-6. [Set up your first templates](x)  
+6. [Set up your first templates](https://github.com/HumanBot000/BoilerGen?tab=readme-ov-file#templates)  
 7. Run `boilergen create` and follow the instructions.
 → All available commands can be accessed by `boilergen --help`.
 
@@ -19,13 +19,13 @@ No more manual integration steps. No more forgotten imports. Just working boiler
 ## Templates
 
 Templates are pre-defined code snippets that can be reused across multiple projects with the same tech stack.  
-If you already have a boilerplate repository, you may need to edit some snippets to follow [BoilerGen's tagging rules](x).
+If you already have a boilerplate repository, you may need to edit some snippets to follow [BoilerGen's tagging rules](https://github.com/HumanBot000/BoilerGen?tab=readme-ov-file#tagging).
 
-Templates are configured in the `boilergen/templates` directory and can be grouped into multiple subgroups [(see examples)](x).
+Templates are configured in the `boilergen/templates` directory and can be grouped into multiple subgroups [(see examples)](https://github.com/HumanBot000/BoilerGen/tree/master/boilergen/templates).
 
 ## Template.yaml
 Each template needs a `template.yaml` file for its Template Definition.
-We highly encourage you to take a look at the  [(Example Templates)](x).
+We highly encourage you to take a look at the  [(Example Templates)](https://github.com/HumanBot000/BoilerGen/tree/master/boilergen/templates).
 Otherwise, here is a quick breakdown:
 ```yaml
 id: flask  
@@ -40,7 +40,7 @@ config:
 |----------	|--------------------------------------------------------------------------------------------------------------------------------------------	|
 | label    	| The human-readable name of this Template (This will be shown in the Template browser)                                                      	|
 | requires 	| List of templates this template relies on (dependence management). This will be needed for injections. Use the `id` field of the template. 	|
-| config   	| A Map of default values for [boilergen configurations](x)                                                                                       	|
+| config   	| A Map of default values for [boilergen configurations](https://github.com/HumanBot000/BoilerGen?tab=readme-ov-file#configurations)                                                                                       	|
 ## Tagging
 
 Often, multiple code snippets depend on each other and can't simply be copy-pasted and expected to work (e.g., special API routes need to be registered in the main API definition before startup). To simplify this process, BoilerGen uses a tagging system to automatically adjust your code.
