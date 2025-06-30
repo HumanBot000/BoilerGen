@@ -1,0 +1,36 @@
+injections:
+  - target: flask
+    at:
+      file: api/main.py
+      tag: imports
+    method:
+      insert:
+        - bottom
+    from: imports.py
+
+  - target: flask
+    at:
+      file: api/main.py
+      tag: init
+    method:
+      insert:
+        - bottom
+    from: register_bp.py
+
+  - target: flask
+    at:
+      file: .env
+      tag: top
+    method:
+      insert:
+        - top
+    from: supabase.env
+
+  - target: flask
+    at:
+      file: requirements.txt
+      tag: dependencies
+    method:
+      insert:
+        - bottom
+    from: auth-requirements.txt

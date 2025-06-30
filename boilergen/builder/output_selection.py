@@ -4,6 +4,8 @@ import shutil
 import questionary
 import typer
 from typing import List
+
+from boilergen.builder.hooks import process_post_generation_hook, process_pre_generation_hook
 from boilergen.builder.project_setup import create_project
 import boilergen.core.template
 
@@ -35,4 +37,6 @@ def ask_for_output_location(selected_templates: List[boilergen.core.template.Tem
                         "Permission denied while trying to delete the output directory. Try running with admin privileges.")
         else:
             raise ValueError(f"Output directory {output_selection} does already exist. Run with --clear-output to overwrite it.")
+    process_pre_generation_hook(output_selection)
     create_project(output_selection,selected_templates,run_config)
+    process_post_generation_hook(output_selection)

@@ -174,3 +174,14 @@ This setup takes the whole content of `data-file1.txt` and inserts right before 
 | method    	| what to do with the current tag content                                              	|                                                                            	| insert, replace           	|
 | -> insert 	| Where to insert the new content                                                      	| Can only be used when method is `insert`                                   	| above, below, top, bottom 	|
 | from      	| The relative path to the file inside the injecting template to pull the content from 	|                                                                            	|                           	|
+
+## Hooks
+Hooks are a way to specify operations to be executed on specific times during the project generation process.
+
+### Defining Hooks
+Hooks are configured in the `boilergen/hooks` directory. The file name specifies the event the hook is triggered on.
+Currently supported events are:
+- `pre-generation.txt`
+- `post-generation.txt`
+
+Inside those files, you can define shell commands to be executed. Each command is separated by a newline. The execution order is top to bottom.

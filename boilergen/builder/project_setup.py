@@ -248,3 +248,4 @@ def create_project(output_path: str, selected_templates: List[Template], run_con
         os.makedirs(os.path.dirname(file.destination_path), exist_ok=True)
         with open(file.destination_path, "w+") as f:
             f.write(file.content)
+

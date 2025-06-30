@@ -1,5 +1,3 @@
-import os
-
 import boilergen.cli.run_config
 from boilergen.builder.parser.tags import TemplateFile
 
@@ -20,7 +18,6 @@ def generate_file_content_data(file: TemplateFile, run_config: boilergen.cli.run
     lines = text.splitlines()
     # Tag removal
     for index,tag in enumerate(sorted(file.tags, key=lambda t: t.line_start, reverse=True)):
-        print(tag.line_end -1 , lines)
         lines[tag.line_start - 1] = ""
         lines[tag.line_end - 1] = ""
         """del lines[tag.line_start]

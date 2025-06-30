@@ -1,6 +1,6 @@
 [project]
 name = "boilergen"
-version = "1.0.0"
+version = "1.1.0"
 description = "CLI tool for creating template based boilerplate projects"
 dependencies = ["typer[all]"]
 requires-python = ">=3.10"
