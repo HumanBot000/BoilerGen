@@ -220,7 +220,7 @@ def display_final_selection(selected_templates: List[Template], base_path: str,
         print("From here on you will exit --minimal-ui mode")
     else:
         print("=" * 50)
-    boilergen.builder.output_selection.ask_for_output_location(selected_templates,run_config)
+    boilergen.builder.output_selection.ask_for_output_location(selected_templates,run_config,base_path)
 
 
 def build_directory_tree(template_dir: str, base_path: str, minimal_ui: bool = False) -> str:

@@ -1,6 +1,0 @@
-id: flask
-label: "Flask Base App"
-requires: []
-config:
-  debug: True
-  port: 5000

@@ -1,0 +1,157 @@
+name: Flutter Release Workflow
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'pubspec.yaml'
+      - '**/*.dart'
+      - '**/*.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  version-check:
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.version-check.outputs.NEW_VERSION }}
+      previous_version: ${{ steps.version-check.outputs.PREVIOUS_VERSION }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all tags
+
+      - name: Check if version is increased
+        id: version-check
+        run: |
+          NEW_VERSION=$(sed -n 's/^version:[[:space:]]*\(.*\)/\1/p' pubspec.yaml)
+          PREVIOUS_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+
+          echo "New version: $NEW_VERSION"
+          echo "Previous version: $PREVIOUS_VERSION"
+
+          if [ "$NEW_VERSION" == "$PREVIOUS_VERSION" ]; then
+            echo "No new version detected."
+            echo "NEW_VERSION=" >> $GITHUB_OUTPUT
+            echo "PREVIOUS_VERSION=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "PREVIOUS_VERSION=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+
+  flutter-build:
+    needs: version-check
+    if: needs.version-check.outputs.version_changed != ''
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.1'
+          cache: true
+
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-flutter-
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set JAVA_HOME environment variable
+        run: echo "JAVA_HOME=${{ env.JAVA_HOME }}" >> $GITHUB_ENV
+
+      - name: Update Gradle Java Home
+        run: |
+          if [ -f android/gradle.properties ]; then
+            sed -i "s|org.gradle.java.home=.*|org.gradle.java.home=$JAVA_HOME|" android/gradle.properties || 
+              echo "org.gradle.java.home=$JAVA_HOME" >> android/gradle.properties
+          else
+            mkdir -p android
+            echo "org.gradle.java.home=$JAVA_HOME" > android/gradle.properties
+          fi
+
+      - name: Run Dart fix and format
+        run: |
+          flutter pub get
+          dart fix --apply
+          dart format .
+
+      - name: Build APK
+        run: flutter build apk --release --dart-define=GEONAMES_API_USER=humanbot000
+
+      - name: Generate changelog
+        id: generate-changelog
+        run: |
+          echo "Release Notes:" > release_notes.txt
+          echo "----------------------" >> release_notes.txt
+          git log ${{ needs.version-check.outputs.previous_version }}..HEAD --no-merges --pretty=format:"- %s" >> release_notes.txt
+
+      - name: Copy APK to root directory
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk ./app-release.apk
+          ls -la *.apk
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-release
+          path: |
+            app-release.apk
+            release_notes.txt
+
+  release:
+    needs: [ version-check, flutter-build ]
+    runs-on: ubuntu-latest
+    if: needs.version-check.outputs.version_changed != ''
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: flutter-release
+          path: ./artifacts
+
+      - name: List downloaded artifacts
+        run: |
+          echo "Contents of ./artifacts:"
+          ls -la ./artifacts/
+
+      - name: Create git tag
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          echo "Creating tag ${{ needs.version-check.outputs.version_changed }}"
+          git tag -a "${{ needs.version-check.outputs.version_changed }}" -m "Release ${{ needs.version-check.outputs.version_changed }}"
+          git push origin "${{ needs.version-check.outputs.version_changed }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ needs.version-check.outputs.version_changed }}"
+          name: "Release ${{ needs.version-check.outputs.version_changed }}"
+          files: |
+            artifacts/app-release.apk
+            artifacts/release_notes.txt
+          body_path: artifacts/release_notes.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

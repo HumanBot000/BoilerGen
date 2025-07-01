@@ -1,3 +1,0 @@
-id: supabaseAuth
-label: "Supabase Auth implementation"
-requires: [flask]

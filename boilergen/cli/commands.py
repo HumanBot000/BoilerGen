@@ -1,28 +1,25 @@
+import configparser
 import itertools
 import os
 from pathlib import Path
 
 import typer
+from git import Repo
 from rich.panel import Panel
 from rich.text import Text
 
 from boilergen.cli.run_config import RunConfig
 from boilergen.core.display import display_final_selection, console
 from boilergen.core.navigator import navigate_templates
-
+import boilergen.builder.output_selection
 app = typer.Typer(help="🔍 Navigate and select templates from your directory structure", no_args_is_help=True,
                   pretty_exceptions_enable=False, add_completion=False)
-DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(), "boilergen", "templates")
+DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(), "boilergen")
 RAINBOW_COLORS = ["red", "yellow", "green", "cyan", "blue", "magenta"]
 
 
 @app.command()
 def create(
-        template_dir: str = typer.Argument(
-            default=DEFAULT_TEMPLATE_DIR,
-            help="Path to the template root directory",
-            file_okay=False
-        ),
         disable_dependencies: bool = typer.Option(
             False,
             "--disable-dependencies",
@@ -53,6 +50,24 @@ def create(
     """
     🚀 Create a new project by selecting templates interactively.
     """
+    config = configparser.ConfigParser()
+    config.read("boilergen.config")
+    template_dir = config["TEMPLATES"].get("TemplateLocation", "")
+    repository_url = config["TEMPLATES"].get("TemplateRepository", None)
+    if template_dir == "" and repository_url is not None:
+        if minimal_ui:
+            print("Cloning templates from repository...")
+        else:
+            console.print("[yellow]Cloning templates from repository...[/yellow]")
+        local_clone_path = os.path.join(os.getcwd(), "cloned_templates")
+        if not os.path.exists(local_clone_path):
+            Repo.clone_from(repository_url, local_clone_path)
+        else:
+            Repo(local_clone_path)
+        template_dir = os.path.join(local_clone_path,"templates")
+    else:
+        template_dir = os.path.join(template_dir or DEFAULT_TEMPLATE_DIR, "templates")
+
     if not os.path.exists(template_dir):
         if minimal_ui:
             print(f"Error: Template directory '{template_dir}' does not exist.")
@@ -133,11 +148,6 @@ def generate_simple_tree_text(path: str, prefix="") -> str:
 
 @app.command()
 def templates(
-        template_dir: Path = typer.Argument(
-            default=DEFAULT_TEMPLATE_DIR,
-            help="Path to the template root directory",
-            file_okay=False
-        ),
         minimal_ui: bool = typer.Option(
             False,
             "--minimal-ui",
@@ -152,7 +162,23 @@ def templates(
     """
     🌳 Display a tree view of all available templates.
     """
-    template_dir = str(template_dir)
+    config = configparser.ConfigParser()
+    config.read("boilergen.config")
+    template_dir = config["TEMPLATES"].get("TemplateLocation", "")
+    repository_url = config["TEMPLATES"].get("TemplateRepository", "")
+    if template_dir == "" and repository_url != "":
+        if minimal_ui:
+            print("Cloning templates from repository...")
+        else:
+            console.print("[yellow]Cloning templates from repository...[/yellow]")
+        local_clone_path = os.path.join(os.getcwd(), "cloned_templates")
+        if not os.path.exists(local_clone_path):
+            Repo.clone_from(repository_url, local_clone_path)
+        else:
+            Repo(local_clone_path)
+        template_dir = os.path.join(local_clone_path, "templates")
+    else:
+        template_dir = os.path.join(template_dir or DEFAULT_TEMPLATE_DIR, "templates")
 
     if not os.path.exists(template_dir):
         if minimal_ui:
@@ -196,3 +222,4 @@ def templates(
                 border_style="blue",
                 padding=(1, 2)
             ))
+    boilergen.builder.output_selection.clear_cloned_repo(os.sep.join(template_dir.split(os.sep)[:-1]), minimal_ui, console)
