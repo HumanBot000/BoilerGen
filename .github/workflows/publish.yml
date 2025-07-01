@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/boilergen
+      url: https://pypi.org/project/boilergen/
     permissions:
       id-token: write
     steps:
@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.x"
+          python-version: "3.12"
       - name: Install build backend
         run: pip install build
 
