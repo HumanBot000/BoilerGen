@@ -1,6 +1,10 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "boilergen"
-version = "1.2.1"
+version = "1.2.2"
 description = "CLI tool for creating template based boilerplate projects"
 dependencies = ["typer[all]"]
 requires-python = ">=3.10"
