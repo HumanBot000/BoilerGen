@@ -25,7 +25,7 @@ Templates are configured in the `boilergen/templates` directory and can be group
 
 ## Template.yaml
 Each template needs a `template.yaml` file for its Template Definition.
-We highly encourage you to take a look at the  [(Example Templates)](https://github.com/HumanBot000/BoilerGen/tree/master/boilergen/templates).
+We highly encourage you to take a look at the  [(Example Template repository)](https://github.com/HumanBot000/boilergen-templates).
 Otherwise, here is a quick breakdown:
 ```yaml
 id: flask  

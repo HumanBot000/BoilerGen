@@ -53,8 +53,8 @@ def create(
     config = configparser.ConfigParser()
     config.read("boilergen.config")
     template_dir = config["TEMPLATES"].get("TemplateLocation", "")
-    repository_url = config["TEMPLATES"].get("TemplateRepository", None)
-    if template_dir == "" and repository_url is not None:
+    repository_url = config["TEMPLATES"].get("TemplateRepository", "")
+    if template_dir == "" and repository_url != "":
         if minimal_ui:
             print("Cloning templates from repository...")
         else:
