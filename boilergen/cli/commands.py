@@ -1,17 +1,18 @@
 import configparser
 import itertools
 import os
-from pathlib import Path
 
+import appdirs
 import typer
 from git import Repo
 from rich.panel import Panel
 from rich.text import Text
 
+import boilergen.builder.output_selection
 from boilergen.cli.run_config import RunConfig
 from boilergen.core.display import display_final_selection, console
 from boilergen.core.navigator import navigate_templates
-import boilergen.builder.output_selection
+
 app = typer.Typer(help="🔍 Navigate and select templates from your directory structure", no_args_is_help=True,
                   pretty_exceptions_enable=False, add_completion=False)
 DEFAULT_TEMPLATE_DIR = os.path.join(os.getcwd(), "boilergen")
@@ -51,7 +52,8 @@ def create(
     🚀 Create a new project by selecting templates interactively.
     """
     config = configparser.ConfigParser()
-    config.read("boilergen.config")
+    create_config_file(config)
+    config.read(os.path.join(appdirs.user_config_dir("boilergen"), "boilergen.config"))
     template_dir = config["TEMPLATES"].get("TemplateLocation", "")
     repository_url = config["TEMPLATES"].get("TemplateRepository", "")
     if template_dir == "" and repository_url != "":
@@ -64,7 +66,7 @@ def create(
             Repo.clone_from(repository_url, local_clone_path)
         else:
             Repo(local_clone_path)
-        template_dir = os.path.join(local_clone_path,"templates")
+        template_dir = os.path.join(local_clone_path, "templates")
     else:
         template_dir = os.path.join(template_dir or DEFAULT_TEMPLATE_DIR, "templates")
 
@@ -146,6 +148,25 @@ def generate_simple_tree_text(path: str, prefix="") -> str:
     return "\n".join(tree_lines)
 
 
+def create_config_file(config):
+    if not os.path.exists(os.path.join(appdirs.user_config_dir("boilergen"), "boilergen.config")):
+        config.add_section("TEMPLATES")
+        config.set("TEMPLATES", "TemplateLocation", "")
+        config.set("TEMPLATES", "TemplateRepository", "")
+        os.makedirs(appdirs.user_config_dir("boilergen"), exist_ok=True)
+        with open(os.path.join(appdirs.user_config_dir("boilergen"), "boilergen.config"), "w") as f:
+            config.write(f)
+
+
+@app.command()
+def config():
+    """
+    📝 Display the configuration file for boilergen.
+    """
+    console.print(
+        f"The configuration file is located at [bold]{os.path.join(appdirs.user_config_dir('boilergen'), 'boilergen.config')}[/bold]")
+
+
 @app.command()
 def templates(
         minimal_ui: bool = typer.Option(
@@ -163,7 +184,8 @@ def templates(
     🌳 Display a tree view of all available templates.
     """
     config = configparser.ConfigParser()
-    config.read("boilergen.config")
+    create_config_file(config)
+    config.read(os.path.join(appdirs.user_config_dir("boilergen"), "boilergen.config"))
     template_dir = config["TEMPLATES"].get("TemplateLocation", "")
     repository_url = config["TEMPLATES"].get("TemplateRepository", "")
     if template_dir == "" and repository_url != "":
@@ -222,4 +244,5 @@ def templates(
                 border_style="blue",
                 padding=(1, 2)
             ))
-    boilergen.builder.output_selection.clear_cloned_repo(os.sep.join(template_dir.split(os.sep)[:-1]), minimal_ui, console)
+    boilergen.builder.output_selection.clear_cloned_repo(os.sep.join(template_dir.split(os.sep)[:-1]), minimal_ui,
+                                                         console)
