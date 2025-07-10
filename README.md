@@ -6,14 +6,10 @@ No more manual integration steps. No more forgotten imports. Just working boiler
 
 ## Setup
 
-1. [Install Python (3.11+) and pip](https://realpython.com/installing-python/)
-2. Clone this repository using    `git clone https://github.com/HumanBot000/BoilerGen.git`
-3. Open your preferred command line and `cd` into the project directory.
-4. Run `pip install -r requirements.txt`
-5. Run `pip install -e .`
-6. [Set up your first templates](https://github.com/HumanBot000/BoilerGen?tab=readme-ov-file#templates)  
-7. Fill in the location of your templates in the config file. (can be found via `boilergen config`)
-8. Run `boilergen create` and follow the instructions.
+1. Run `pip install boilergen` 
+2. [Set up your first templates](https://github.com/HumanBot000/BoilerGen?tab=readme-ov-file#templates)  
+3. Fill in the location of your templates in the config file. (can be found via `boilergen config`)
+4. Run `boilergen create` and follow the instructions.
 → All available commands can be accessed by `boilergen --help`.
 
 
