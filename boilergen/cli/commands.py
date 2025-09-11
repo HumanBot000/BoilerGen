@@ -4,7 +4,7 @@ import os
 
 import appdirs
 import typer
-from git import Repo
+from git import Repo, InvalidGitRepositoryError
 from rich.panel import Panel
 from rich.text import Text
 
@@ -65,7 +65,13 @@ def create(
         if not os.path.exists(local_clone_path):
             Repo.clone_from(repository_url, local_clone_path)
         else:
-            Repo(local_clone_path)
+            try:
+                Repo(local_clone_path)  # Valid repository?
+            except InvalidGitRepositoryError:
+                # Not a valid git repo, remove and re-clone
+                import shutil
+                shutil.rmtree(local_clone_path)
+                Repo.clone_from(repository_url, local_clone_path)
         template_dir = os.path.join(local_clone_path, "templates")
     else:
         template_dir = os.path.join(template_dir or DEFAULT_TEMPLATE_DIR, "templates")
