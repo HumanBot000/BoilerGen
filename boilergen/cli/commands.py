@@ -66,12 +66,11 @@ def create(
             Repo.clone_from(repository_url, local_clone_path)
         else:
             try:
-                Repo(local_clone_path)  # Valid repository?
+                Repo(local_clone_path)
             except InvalidGitRepositoryError:
-                # Not a valid git repo, remove and re-clone
                 import shutil
                 shutil.rmtree(local_clone_path)
-                Repo.clone_from(repository_url, local_clone_path)
+                Repo.clone_from(url=repository_url, to_path=local_clone_path)
         template_dir = os.path.join(local_clone_path, "templates")
     else:
         template_dir = os.path.join(template_dir or DEFAULT_TEMPLATE_DIR, "templates")
@@ -203,10 +202,17 @@ def templates(
         if not os.path.exists(local_clone_path):
             Repo.clone_from(repository_url, local_clone_path)
         else:
-            Repo(local_clone_path)
+            try:
+                Repo(local_clone_path)
+            except InvalidGitRepositoryError:
+                import shutil
+                shutil.rmtree(local_clone_path)
+                Repo.clone_from(url=repository_url, to_path=local_clone_path)
         template_dir = os.path.join(local_clone_path, "templates")
+
     else:
         template_dir = os.path.join(template_dir or DEFAULT_TEMPLATE_DIR, "templates")
+
 
     if not os.path.exists(template_dir):
         if minimal_ui:
