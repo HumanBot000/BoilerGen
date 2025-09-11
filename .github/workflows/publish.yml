@@ -13,16 +13,23 @@ jobs:
       url: https://pypi.org/project/boilergen/
     permissions:
       id-token: write
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.12"
+
       - name: Install build backend
-        run: pip install build
+        run: pip install build hatchling
+
+      - name: Clean old build artifacts
+        run: rm -rf dist build *.egg-info
 
       - name: Build package
         run: python -m build
+
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
