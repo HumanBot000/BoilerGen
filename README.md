@@ -1,3 +1,5 @@
+![BoilerGen Demo](static/boilergen_demo.gif)
+
 # BoilerGen
 
 BoilerGen creates files from reusable templates and injects necessary code (e.g. imports, registrations) directly into your project — without breaking existing code.
