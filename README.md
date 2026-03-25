@@ -11,7 +11,6 @@ No more manual integration steps. No more forgotten imports. Just working boiler
 3. Fill in the location of your templates in the config file. (can be found via `boilergen config`)
 4. Run `boilergen create` and follow the instructions.
     - Use `--dry-run` to preview changes without writing files.
-    - Use `--fiesta` for some extra flair. 
 → All available commands can be accessed by `boilergen --help`.
 
 
