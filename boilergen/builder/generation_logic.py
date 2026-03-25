@@ -17,15 +17,10 @@ def generate_file_content_data(file: TemplateFile, run_config: boilergen.cli.run
 
     lines = text.splitlines()
     # Tag removal
-    for index,tag in enumerate(sorted(file.tags, key=lambda t: t.line_start, reverse=True)):
+    for index, tag in enumerate(sorted(file.tags, key=lambda t: t.line_start, reverse=True)):
         lines[tag.line_start - 1] = ""
         lines[tag.line_end - 1] = ""
-        """del lines[tag.line_start]
-        del lines[tag.line_end-1]
-        for other_tag in sorted(file.tags, key=lambda t: t.line_start, reverse=True)[index:]:
-            other_tag.line_start -= 2
-            other_tag.line_end -= 2
-        """
+    
     text = "\n".join(lines)
     file.content = text
 

@@ -1,12 +1,10 @@
 import collections
-import os
+from pathlib import Path
 import time
-from typing import List, Dict
-
-import questionary
-import rainbow_tqdm
-import tqdm
+from typing import List, Dict, Optional, Any
 import yaml
+from tqdm import tqdm
+import rainbow_tqdm
 from prompt_toolkit import Application
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import Layout
@@ -19,233 +17,186 @@ from boilergen.builder.generation_logic import generate_file_content_data
 from boilergen.builder.parser.configs import extract_configs, fetch_yaml_configs, NOT_DEFINED
 from boilergen.builder.parser.tags import TemplateFile, extract_tags
 from boilergen.core.template import Template
-from ..cli import clear_shell
-from ..cli.run_config import RunConfig
+from boilergen.core.ui import get_ui
+from boilergen.cli.run_config import RunConfig
 
 
-def sort_templates_by_dependencies(
-        templates: List[Template],
-        strict: bool = True
-) -> List[Template]:
-    """
-    Sorts templates topologically based on declared dependencies.
-    If strict is False (expert mode), missing dependencies are ignored.
-    """
+def sort_templates_by_dependencies(templates: List[Template], strict: bool = True) -> List[Template]:
+    """Sorts templates topologically based on declared dependencies."""
     id_map: Dict[str, Template] = {t.id: t for t in templates}
     graph: Dict[str, List[str]] = {t.id: [] for t in templates}
     in_degree: Dict[str, int] = {t.id: 0 for t in templates}
 
     for t in templates:
         for dep in t.requires:
-            if dep not in graph:
-                if strict:
-                    raise ValueError(f"Missing dependency '{dep}' required by template '{t.id}'")
-                else:
-                    continue
+            if dep not in id_map:
+                if strict: raise ValueError(f"Missing dependency '{dep}' required by '{t.id}'")
+                continue
             graph[dep].append(t.id)
             in_degree[t.id] += 1
 
     queue = collections.deque([tid for tid, degree in in_degree.items() if degree == 0])
     sorted_ids = []
-
     while queue:
-        current = queue.popleft()
-        sorted_ids.append(current)
-        for neighbor in graph[current]:
+        curr = queue.popleft()
+        sorted_ids.append(curr)
+        for neighbor in graph[curr]:
             in_degree[neighbor] -= 1
-            if in_degree[neighbor] == 0:
-                queue.append(neighbor)
+            if in_degree[neighbor] == 0: queue.append(neighbor)
 
     if len(sorted_ids) != len(templates):
         raise ValueError("Cyclic dependency detected among templates")
-
     return [id_map[tid] for tid in sorted_ids]
 
 
-def prepare_objects(output_path: str, selected_templates: List[Template], run_config: RunConfig):
+def prepare_objects(output_path: Path, selected_templates: List[Template], run_config: RunConfig):
+    """Scan selected templates and prepare TemplateFile objects."""
     template_files = []
+    sorted_templates = sort_templates_by_dependencies(selected_templates, not run_config.disable_dependencies)
 
-    for template in sort_templates_by_dependencies(selected_templates, not run_config.disable_dependencies):
-        yaml_path = os.path.join(template.path, "template.yaml")
-        if not os.path.isfile(yaml_path):
-            raise FileNotFoundError(f"'template.yaml' not found in template: {template.path}")
+    for template in sorted_templates:
+        template_path = Path(template.path)
+        yaml_path = template_path / "template.yaml"
+        if not yaml_path.is_file():
+            raise FileNotFoundError(f"'template.yaml' not found in {template_path}")
 
-        with open(yaml_path, "r") as f:
+        with open(yaml_path, "r", encoding="utf-8") as f:
             yaml_data = yaml.safe_load(f)
 
-        injections_folder = os.path.join(template.path, "injections;")
-        for root, dirs, files in os.walk(template.path):
-            dirs[:] = [d for d in dirs if os.path.join(root, d) != injections_folder]
+        injections_dir = template_path / "injections;"
+        
+        # Walk through template directory
+        for item in template_path.rglob("*"):
+            if not item.is_file() or item.name == "template.yaml":
+                continue
+            
+            # Skip injections directory
+            try:
+                if item.relative_to(injections_dir): continue
+            except ValueError: pass
 
-            for file in files:
-                if file == "template.yaml":
-                    continue
+            # Calculate destination path
+            # We assume the structure is: template_dir / "template" / ...
+            # or directly in template_dir if there is no "template" folder?
+            # Existing logic: rel_path.split(os.sep, 1)[1:] -> strips the first part.
+            rel_parts = item.relative_to(template_path).parts
+            if len(rel_parts) < 2: continue # Should at least have 'template/' and a filename
+            
+            abstracted_rel_path = Path(*rel_parts[1:])
+            dest_path = output_path / abstracted_rel_path
 
-                full_path = os.path.join(root, file)
+            with open(item, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            tf = TemplateFile(
+                content,
+                extract_tags(content),
+                extract_configs(content),
+                str(dest_path)
+            )
+            fetch_yaml_configs(tf.configs, yaml_data)
+            template_files.append(tf)
 
-                if os.path.commonpath([full_path, injections_folder]) == injections_folder:
-                    continue
-
-                relative_parts = os.path.relpath(root, template.path).split(os.sep, maxsplit=1)[1:]  # strip template/
-                abstracted_path = os.path.join(*relative_parts) if relative_parts else ""
-
-                with open(full_path, "r") as f:
-                    content = f.read()
-                template_file = TemplateFile(
-                    content,
-                    extract_tags(content),
-                    extract_configs(content),
-                    f"{output_path}{os.sep}{abstracted_path}{os.sep}{file}"
-                )
-                fetch_yaml_configs(template_file.configs, yaml_data)
-                template_files.append(template_file)
-
-        if os.path.isdir(injections_folder):
-            injections_yaml = os.path.join(injections_folder, "injections.yaml")
-            if os.path.isfile(injections_yaml):
-                with open(injections_yaml, "r") as f:
-                    injections_data = yaml.safe_load(f)
+        # Handle injections
+        if injections_dir.is_dir():
+            injections_yaml = injections_dir / "injections.yaml"
+            if injections_yaml.is_file():
+                with open(injections_yaml, "r", encoding="utf-8") as f:
+                    inj_data = yaml.safe_load(f)
                 for tf in template_files:
-                    tf.injections = parse_injections(injections_data,
-                                                     f"{template.path}{os.sep}injections;{os.sep}injections.yaml")
+                    tf.injections = parse_injections(inj_data, str(injections_yaml))
 
     return template_files
 
 
 def refresh_tags_and_configs_after_injections(template_files: List[TemplateFile]):
-    for file in template_files:
-        # Re-extract tags with updated line numbers
-        file.tags = extract_tags(file.content)
-
-        # Re-extract configs with updated positions
-        new_configs = extract_configs(file.content)
-
-        # Preserve the yaml_value and cli_value from the original configs
-        config_lookup = {config.identifier: config for config in file.configs}
-
-        for new_config in new_configs:
-            if new_config.identifier in config_lookup:
-                old_config = config_lookup[new_config.identifier]
-                new_config.yaml_value = old_config.yaml_value
-                new_config.cli_value = old_config.cli_value
-
-        file.configs = new_configs
+    """Refresh tags and configs as content might have shifted after injections."""
+    for tf in template_files:
+        tf.tags = extract_tags(tf.content)
+        new_configs = extract_configs(tf.content)
+        old_map = {c.identifier: c for c in tf.configs}
+        for nc in new_configs:
+            if nc.identifier in old_map:
+                nc.yaml_value = old_map[nc.identifier].yaml_value
+                nc.cli_value = old_map[nc.identifier].cli_value
+        tf.configs = new_configs
 
 
 def cli_config_editor(current_config: dict, file_path: str) -> dict | None:
-    lines = [f"{k} = {v}" for k, v in current_config.items()]
-    initial_text = "\n".join(lines)
+    """Interactive editor for template configurations."""
+    initial_text = "\n".join([f"{k} = {v}" for k, v in current_config.items()])
     expected_keys = set(current_config.keys())
 
-    editor = TextArea(
-        text=initial_text,
-        multiline=True,
-        wrap_lines=False,
-        scrollbar=True,
-        line_numbers=True
-    )
-
-    # File path label at top (read-only)
-    path_label = Label(
-        text=f"File: {file_path}",
-        style="class:filepath"
-    )
-
-    # Status bar at bottom
-    statusbar = Label(
-        text="Edit these configurations | Ctrl+S = Confirm",
-        style="class:status"
-    )
+    editor = TextArea(text=initial_text, multiline=True, scrollbar=True, line_numbers=True)
+    path_label = Label(text=f"File: {file_path}", style="class:filepath")
+    statusbar = Label(text="Edit configurations | Ctrl+S = Confirm", style="class:status")
 
     bindings = KeyBindings()
-
     @bindings.add("c-s")
     def _(event):
-        raw = editor.text
         parsed = {}
-
-        for i, line in enumerate(raw.splitlines(), start=1):
+        for i, line in enumerate(editor.text.splitlines(), 1):
             if "=" not in line:
                 statusbar.text = f"Line {i} missing '='."
                 return
-
-            k, v = line.split("=", 1)
-            k, v = k.strip(), v.strip()
-
-            if not k:
-                statusbar.text = f"Line {i}: empty key."
-                return
-            if not v:
-                statusbar.text = f"Line {i}: value for '{k}' is empty."
+            k, v = map(str.strip, line.split("=", 1))
+            if not k or not v:
+                statusbar.text = f"Line {i}: empty key or value."
                 return
             parsed[k] = v
 
-        parsed_keys = set(parsed.keys())
-        if parsed_keys != expected_keys:
-            missing = expected_keys - parsed_keys
-            extra = parsed_keys - expected_keys
-            if missing:
-                statusbar.text = f"Missing key(s): {', '.join(missing)}"
-            elif extra:
-                statusbar.text = f"Unknown key(s): {', '.join(extra)}"
+        if set(parsed.keys()) != expected_keys:
+            statusbar.text = "Keys do not match original configuration."
             return
-
         event.app.exit(result=parsed)
 
-    layout = Layout(HSplit([
-        path_label,
-        editor,
-        statusbar
-    ]))
-
-    style = Style.from_dict({
-        "status": "reverse",
-        "filepath": "bold",
-    })
-
     app = Application(
-        layout=layout,
+        layout=Layout(HSplit([path_label, editor, statusbar])),
         key_bindings=bindings,
-        style=style,
+        style=Style.from_dict({"status": "reverse", "filepath": "bold"}),
         full_screen=True
     )
-
-    result = app.run()
-    return result
+    return app.run()
 
 
-def interactive_config_editor(template_files: List[TemplateFile]):
-    for file in template_files:
-        if len(file.configs) > 0:
-            clear_shell()
-            new_configs = cli_config_editor({
-                e.identifier: e.insertion_value if e.insertion_value != NOT_DEFINED else "" for e in file.configs
-            }, file.destination_path)
-            for config in file.configs:
-                if config.identifier in new_configs:
-                    config.cli_value = new_configs[config.identifier]
+def interactive_config_editor(template_files: List[TemplateFile], ui):
+    """Iterate through template files and open editor for those with configs."""
+    for tf in template_files:
+        if tf.configs:
+            ui.clear()
+            initial_vals = {c.identifier: (c.insertion_value if c.insertion_value != NOT_DEFINED else "") for c in tf.configs}
+            new_vals = cli_config_editor(initial_vals, tf.destination_path)
+            if new_vals is None: continue # User cancelled? Or handle error
+            for c in tf.configs:
+                if c.identifier in new_vals:
+                    c.cli_value = new_vals[c.identifier]
                 else:
-                    raise ValueError(f"Missing config value for key '{config.identifier}'")
+                    raise ValueError(f"Missing config value for '{c.identifier}'")
 
 
-def create_project(output_path: str, selected_templates: List[Template], run_config: RunConfig):
-    clear_shell()
-    questionary.press_any_key_to_continue(
-        "We will now step through the templates to generate your boilerplate project. Press any key to continue...").ask()
+def create_project(output_path_str: str, selected_templates: List[Template], run_config: RunConfig):
+    """Main project generation orchestration."""
+    ui = get_ui(run_config.minimal_ui)
+    ui.clear()
+    ui.press_any_key("We will now step through the templates to generate your project. Press any key to continue...")
 
-    template_files = prepare_objects(output_path, selected_templates, run_config)
-    run_injections(template_files, run_config, output_path)
-    refresh_tags_and_configs_after_injections(template_files) # The lines have updated significantly after injections and this is the easiest way
-    interactive_config_editor(template_files)
+    out_path = Path(output_path_str)
+    template_files = prepare_objects(out_path, selected_templates, run_config)
+    
+    run_injections(template_files, run_config, output_path_str)
+    refresh_tags_and_configs_after_injections(template_files)
+    interactive_config_editor(template_files, ui)
 
-    for file in rainbow_tqdm.tqdm(template_files) if run_config.party_mode else tqdm.tqdm(template_files):
-        generate_file_content_data(file, run_config)
-        if run_config.party_mode:
-            time.sleep(0.1)
+    # File generation with progress bar
+    progress = rainbow_tqdm.tqdm(template_files) if run_config.party_mode else tqdm(template_files)
+    for tf in progress:
+        generate_file_content_data(tf, run_config)
+        if run_config.party_mode: time.sleep(0.1)
 
-    clear_shell()
-    for file in template_files:
-        os.makedirs(os.path.dirname(file.destination_path), exist_ok=True)
-        with open(file.destination_path, "w+") as f:
-            f.write(file.content)
-
+    ui.clear()
+    for tf in template_files:
+        dest = Path(tf.destination_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(tf.content, encoding="utf-8")
+    
+    ui.success(f"Project generated successfully at: {out_path}")

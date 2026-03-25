@@ -1,111 +1,55 @@
-import os
-from typing import List, Tuple, Dict
+from pathlib import Path
+from typing import List, Tuple, Dict, Optional
 from .template import Template
 
 TEMPLATE_MARKER = "template.yaml"
 
-
 def list_subgroups_and_templates(path: str) -> Tuple[List[str], List[Template]]:
-    """
-    List subdirectories and templates in the given path.
-
-    Args:
-        path: Directory path to scan
-
-    Returns:
-        Tuple of (subgroups, templates) lists
-    """
-    subgroups = []
-    templates = []
-    try:
-        for entry in os.listdir(path):
-            full_path = os.path.join(path, entry)
-            if os.path.isdir(full_path):
-                if os.path.exists(os.path.join(full_path, TEMPLATE_MARKER)):
-                    template = Template.from_yaml_file(full_path)
-                    if template:
-                        templates.append(template)
-                else:
-                    subgroups.append(entry)
-    except FileNotFoundError:
-        pass
+    """List subdirectories and templates in the given path."""
+    subgroups, templates = [], []
+    p = Path(path)
+    if not p.exists(): return [], []
+    
+    for entry in p.iterdir():
+        if entry.is_dir():
+            marker = entry / TEMPLATE_MARKER
+            if marker.exists():
+                template = Template.from_yaml_file(str(entry))
+                if template: templates.append(template)
+            else:
+                subgroups.append(entry.name)
+                
     return sorted(subgroups), sorted(templates, key=lambda t: t.label)
 
-
 def find_all_templates(base_path: str) -> Dict[str, Template]:
-    """
-    Recursively find all templates in the directory structure.
-
-    Returns:
-        Dict mapping template IDs to Template objects
-    """
+    """Recursively find all templates in the directory structure."""
     templates = {}
-
-    def scan_directory(path: str):
-        subgroups, path_templates = list_subgroups_and_templates(path)
-
-        # Add templates from current directory
-        for template in path_templates:
-            templates[template.id] = template
-
-        # Recursively scan subdirectories
-        for subgroup in subgroups:
-            scan_directory(os.path.join(path, subgroup))
-
-    scan_directory(base_path)
+    def scan_directory(path: Path):
+        subgroups, path_templates = list_subgroups_and_templates(str(path))
+        for t in path_templates: templates[t.id] = t
+        for s in subgroups: scan_directory(path / s)
+        
+    scan_directory(Path(base_path))
     return templates
 
-
-def resolve_dependencies(selected_template_ids: List[str], all_templates: Dict[str, Template]) -> Tuple[
-    List[str], List[str]]:
-    """
-    Resolve template dependencies and return the complete list of required templates.
-
-    Args:
-        selected_template_ids: List of manually selected template IDs
-        all_templates: Dict of all available templates
-
-    Returns:
-        Tuple of (all_required_ids, auto_selected_ids)
-    """
-    resolved = set()
-    auto_selected = set()
-    to_process = list(selected_template_ids)
+def resolve_dependencies(selected_ids: List[str], all_templates: Dict[str, Template]) -> Tuple[List[str], List[str]]:
+    """Resolve template dependencies and return all required IDs and auto-selected IDs."""
+    resolved, auto_selected = set(), set()
+    to_process = list(selected_ids)
 
     while to_process:
-        template_id = to_process.pop(0)
-        if template_id in resolved:
-            continue
+        tid = to_process.pop(0)
+        if tid in resolved: continue
+        resolved.add(tid)
 
-        resolved.add(template_id)
-
-        if template_id in all_templates:
-            template = all_templates[template_id]
-            for dependency in template.requires:
-                if dependency not in resolved:
-                    to_process.append(dependency)
-                    if dependency not in selected_template_ids:
-                        auto_selected.add(dependency)
+        if tid in all_templates:
+            for dep in all_templates[tid].requires:
+                if dep not in resolved:
+                    to_process.append(dep)
+                    if dep not in selected_ids: auto_selected.add(dep)
 
     return list(resolved), list(auto_selected)
 
-
-def find_dependents(template_id: str, all_templates: Dict[str, Template], selected_ids: List[str]) -> List[str]:
-    """
-    Find templates that depend on the given template ID among selected templates.
-
-    Args:
-        template_id: The template ID to find dependents for
-        all_templates: Dict of all available templates
-        selected_ids: List of currently selected template IDs
-
-    Returns:
-        List of template IDs that depend on the given template
-    """
-    dependents = []
-    for selected_id in selected_ids:
-        if selected_id in all_templates:
-            template = all_templates[selected_id]
-            if template_id in template.requires:
-                dependents.append(selected_id)
-    return dependents
+def find_dependents(tid: str, all_templates: Dict[str, Template], selected_ids: List[str]) -> List[str]:
+    """Find templates that depend on the given ID among selected templates."""
+    return [sid for sid in selected_ids if sid in all_templates and tid in all_templates[sid].requires]
