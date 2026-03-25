@@ -66,6 +66,7 @@ def prepare_objects(output_path: Path, selected_templates: List[Template], run_c
         injections_dir = template_path / "injections;"
         
         # Walk through template directory
+        item: Path
         for item in template_path.rglob("*"):
             if not item.is_file() or item.name == "template.yaml":
                 continue
@@ -191,7 +192,15 @@ def create_project(output_path_str: str, selected_templates: List[Template], run
     progress = rainbow_tqdm.tqdm(template_files) if run_config.party_mode else tqdm(template_files)
     for tf in progress:
         generate_file_content_data(tf, run_config)
+        
+        if run_config.dry_run:
+            ui.display_file_content(tf.destination_path, tf.content)
+            
         if run_config.party_mode: time.sleep(0.1)
+
+    if run_config.dry_run:
+        ui.success("Dry run complete. No files were written.")
+        return
 
     ui.clear()
     for tf in template_files:

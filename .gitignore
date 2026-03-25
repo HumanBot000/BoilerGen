@@ -1,3 +1,4 @@
 /boilergen.egg-info/
 /.venv/
 /dist
+/pytest-cache-files-*/

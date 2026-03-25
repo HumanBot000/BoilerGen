@@ -58,6 +58,10 @@ class UI(ABC):
         pass
 
     @abstractmethod
+    def display_file_content(self, title: str, content: str, lexer: Optional[str] = None):
+        pass
+
+    @abstractmethod
     def success(self, message: str):
         pass
 
@@ -67,6 +71,16 @@ class RichUI(UI):
     
     def __init__(self):
         self.console = Console()
+
+    def display_file_content(self, title: str, content: str, lexer: Optional[str] = None):
+        from rich.syntax import Syntax
+        if lexer is None:
+            lexer = "text"
+            if "." in title:
+                lexer = title.split(".")[-1]
+        
+        syntax = Syntax(content, lexer, theme="monokai", line_numbers=True)
+        self.console.print(Panel(syntax, title=f"📄 {title}", border_style="blue", padding=(1, 2)))
 
     def prompt(self, message: str, default: str = "") -> str:
         return questionary.text(message, default=default).ask()
@@ -304,6 +318,11 @@ class MinimalUI(UI):
 
     def success(self, message: str):
         print(f"Success: {message}")
+
+    def display_file_content(self, title: str, content: str, lexer: Optional[str] = None):
+        print(f"\n--- 📄 {title} ---")
+        print(content)
+        print("-" * (len(title) + 10))
 
     def prompt(self, message: str, default: str = "") -> str:
         return input(f"{message} [{default}]: ") or default

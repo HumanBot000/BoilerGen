@@ -26,25 +26,30 @@ def ask_for_output_location(selected_templates: List[Template], run_config, temp
     default_output = str(Path.cwd() / "output")
     output_path = Path(ui.prompt("Where do you want to generate the output?", default=default_output))
 
-    if not output_path.exists():
-        output_path.mkdir(parents=True, exist_ok=True)
-    elif run_config.clear_output:
-        if ui.confirm(f"Output directory {output_path} already exists. Overwrite it? (DELETES DATA!)"):
-            try:
-                shutil.rmtree(output_path, onerror=force_remove_readonly)
-                output_path.mkdir(parents=True, exist_ok=True)
-            except PermissionError:
-                ui.error("Permission denied while deleting output directory.")
-                return
-    else:
-        ui.error(f"Output directory {output_path} already exists. Use --clear-output to overwrite.")
-        return
+    if not run_config.dry_run:
+        if not output_path.exists():
+            output_path.mkdir(parents=True, exist_ok=True)
+        elif run_config.clear_output:
+            if ui.confirm(f"Output directory {output_path} already exists. Overwrite it? (DELETES DATA!)"):
+                try:
+                    shutil.rmtree(output_path, onerror=force_remove_readonly)
+                    output_path.mkdir(parents=True, exist_ok=True)
+                except PermissionError:
+                    ui.error("Permission denied while deleting output directory.")
+                    return
+        else:
+            ui.error(f"Output directory {output_path} already exists. Use --clear-output to overwrite.")
+            return
 
     # template_dir passed here is the 'templates' subdir. Hooks might need the root.
     template_root = Path(template_dir).parent
     
-    process_pre_generation_hook(str(output_path), str(template_root))
+    if not run_config.dry_run:
+        process_pre_generation_hook(str(output_path), str(template_root))
+    
     create_project(str(output_path), selected_templates, run_config)
-    process_post_generation_hook(str(output_path), str(template_root))
+    
+    if not run_config.dry_run:
+        process_post_generation_hook(str(output_path), str(template_root))
     
     clear_cloned_repo(str(template_root), run_config.minimal_ui, ui)
