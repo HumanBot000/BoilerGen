@@ -10,6 +10,8 @@ No more manual integration steps. No more forgotten imports. Just working boiler
 2. [Set up your first templates](https://github.com/HumanBot000/BoilerGen?tab=readme-ov-file#templates)  
 3. Fill in the location of your templates in the config file. (can be found via `boilergen config`)
 4. Run `boilergen create` and follow the instructions.
+    - Use `--dry-run` to preview changes without writing files.
+    - Use `--fiesta` for some extra flair. 
 → All available commands can be accessed by `boilergen --help`.
 
 
@@ -18,7 +20,12 @@ No more manual integration steps. No more forgotten imports. Just working boiler
 Templates are pre-defined code snippets that can be reused across multiple projects with the same tech stack.  
 If you already have a boilerplate repository, you may need to edit some snippets to follow [BoilerGen's tagging rules](https://github.com/HumanBot000/BoilerGen?tab=readme-ov-file#tagging).
 
-Templates are configured in the `boilergen/templates` directory and can be grouped into multiple subgroups [(see examples)](https://github.com/HumanBot000/BoilerGen/tree/master/boilergen/templates).
+Templates are configured in the `boilergen/templates` directory and can be grouped into multiple subgroups.
+
+### Template Library
+We provide a community-driven [**Template Library**](https://github.com/HumanBot000/boilergen-templates). 
+New users are encouraged to use it as a starting point and extend it with their own templates. 
+**Pull requests are welcome!** Help us build a robust library of boilerplate templates for everyone.
 
 ## Template.yaml
 Each template needs a `template.yaml` file for its Template Definition.
