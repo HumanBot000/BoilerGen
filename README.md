@@ -1,4 +1,4 @@
-![BoilerGen Demo](static/boilergen_demo.gif)
+![BoilerGen Demo](https://github.com/HumanBot000/BoilerGen/blob/master/static/example.gif)
 
 # BoilerGen
 
