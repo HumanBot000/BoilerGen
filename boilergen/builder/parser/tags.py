@@ -3,8 +3,8 @@ from typing import List
 
 from boilergen.builder.parser.configs import ValueConfig
 
-TAG_OPENING_REGEX = r"<<boilergen:(?!config\b)[^>\s]+"
-TAG_CLOSING_REGEX = r"boilergen:(?!config\b)[^>\s]+>>"
+TAG_OPENING_REGEX = r".*<<boilergen:(?!config\b)[^>\s]+.*"
+TAG_CLOSING_REGEX = r".*boilergen:(?!config\b)[^>\s]+>>.*"
 
 
 class Tag:
