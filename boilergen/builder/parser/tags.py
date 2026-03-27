@@ -1,7 +1,7 @@
 import re
-from typing import List
-
+from typing import List, Union, Optional, Callable, Any
 from boilergen.builder.parser.configs import ValueConfig
+from boilergen.core.observable import ObservableList
 
 TAG_OPENING_REGEX = r".*<<boilergen:(?!config\b)[^>\s]+.*"
 TAG_CLOSING_REGEX = r".*boilergen:(?!config\b)[^>\s]+>>.*"
@@ -19,15 +19,40 @@ class Tag:
 
 class TemplateFile:
     def __init__(self, content: str, tags: List[Tag], configs: List[ValueConfig], destination_path: str,
-                 injections=None):
+                 injections=None, tag_change_callback: Optional[Callable[[Any,Any,Any], None]] = None):
         if injections is None:
             injections = []
         self.content = content
-        self.tags = tags
+        self.tag_change_callback = tag_change_callback
+        self._tags = ObservableList(tags, callback=self.on_tags_changed)
         self.configs = configs
         self.destination_path = destination_path
         self.injections = injections
+        
+        # Notify about initial scan if tags exist
+        if tags:
+            for tag in tags:
+                self.on_tags_changed(self._tags, "scanned", tag)
 
+    @property
+    def tags(self):
+        return self._tags
+
+    @tags.setter
+    def tags(self, value: Union[List[Tag], ObservableList]):
+        if isinstance(value, ObservableList):
+            self._tags = value
+            self._tags._callback = self.on_tags_changed
+        else:
+            self._tags = ObservableList(value, callback=self.on_tags_changed)
+        
+        # Notify about refreshed tags
+        for tag in self._tags:
+            self.on_tags_changed(self._tags, "refreshed", tag)
+
+    def on_tags_changed(self, *args):
+        if self.tag_change_callback:
+            self.tag_change_callback(self, *args)
 
 def extract_tags(file_content: str):
     opening_tags = []

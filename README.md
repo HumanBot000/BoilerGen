@@ -190,3 +190,25 @@ Currently supported events are:
 - `post-generation.txt`
 
 Inside those files, you can define shell commands to be executed. Each command is separated by a newline. The execution order is top to bottom.
+
+---
+
+## Debugging
+
+If you encounter issues during template navigation or project generation, you can enable debug mode.
+
+```bash
+boilergen create --debug <type> [--debug-output <file>]
+```
+
+### Debug Types
+| Type         | Description                                                                 |
+|--------------|-----------------------------------------------------------------------------|
+| `tags`       | Logs tag extraction and lifecycle updates during generation.               |
+| `injections` | Logs when injections are applied, including source, target, and method.     |
+| `all`        | Enables all available debug logging.                                        |
+
+### Options
+- `--debug-output`: (Optional) Path to a file where debug logs will be persisted. If not provided, logs are only printed to the console.
+- Debug logs include timestamps and clear identifiers for the event type.
+

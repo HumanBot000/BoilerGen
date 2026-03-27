@@ -51,10 +51,21 @@ def sort_templates_by_dependencies(templates: List[Template], strict: bool = Tru
 
 def prepare_objects(output_path: Path, selected_templates: List[Template], run_config: RunConfig):
     """Scan selected templates and prepare TemplateFile objects."""
+
+    def on_tag_change(tf: TemplateFile,full_tag_list, action, *args):
+        if run_config.debug_manager:
+            run_config.debug_manager.state_change("tags",tf,full_tag_list,action,*args)
     template_files = []
+    
+    if run_config.debug_manager:
+        run_config.debug_manager.state_change("general", f"Sorting {len(selected_templates)} templates by dependencies.")
+        
     sorted_templates = sort_templates_by_dependencies(selected_templates, not run_config.disable_dependencies)
 
     for template in sorted_templates:
+        if run_config.debug_manager:
+            run_config.debug_manager.state_change("general", f"Processing template: {template.id}")
+            
         template_path = Path(template.path)
         yaml_path = template_path / "template.yaml"
         if not yaml_path.is_file():
@@ -77,14 +88,14 @@ def prepare_objects(output_path: Path, selected_templates: List[Template], run_c
             except ValueError: pass
 
             # Calculate destination path
-            # We assume the structure is: template_dir / "template" / ...
-            # or directly in template_dir if there is no "template" folder?
-            # Existing logic: rel_path.split(os.sep, 1)[1:] -> strips the first part.
             rel_parts = item.relative_to(template_path).parts
             if len(rel_parts) < 2: continue # Should at least have 'template/' and a filename
             
             abstracted_rel_path = Path(*rel_parts[1:])
             dest_path = output_path / abstracted_rel_path
+
+            if run_config.debug_manager:
+                run_config.debug_manager.state_change("general", f"Reading template file: {item.name} -> {abstracted_rel_path}")
 
             with open(item, "r", encoding="utf-8") as f:
                 content = f.read()
@@ -93,7 +104,8 @@ def prepare_objects(output_path: Path, selected_templates: List[Template], run_c
                 content,
                 extract_tags(content),
                 extract_configs(content),
-                str(dest_path)
+                str(dest_path),
+                tag_change_callback=on_tag_change
             )
             fetch_yaml_configs(tf.configs, yaml_data)
             template_files.append(tf)
@@ -102,6 +114,8 @@ def prepare_objects(output_path: Path, selected_templates: List[Template], run_c
         if injections_dir.is_dir():
             injections_yaml = injections_dir / "injections.yaml"
             if injections_yaml.is_file():
+                if run_config.debug_manager:
+                    run_config.debug_manager.state_change("general", f"Loading injections for {template.id}")
                 with open(injections_yaml, "r", encoding="utf-8") as f:
                     inj_data = yaml.safe_load(f)
                 for tf in template_files:
@@ -110,8 +124,10 @@ def prepare_objects(output_path: Path, selected_templates: List[Template], run_c
     return template_files
 
 
-def refresh_tags_and_configs_after_injections(template_files: List[TemplateFile]):
+def refresh_tags_and_configs_after_injections(template_files: List[TemplateFile], run_config: RunConfig):
     """Refresh tags and configs as content might have shifted after injections."""
+    if run_config.debug_manager:
+        run_config.debug_manager.state_change("general", "Refreshing tags and configs after injections.")
     for tf in template_files:
         tf.tags = extract_tags(tf.content)
         new_configs = extract_configs(tf.content)
@@ -182,13 +198,27 @@ def create_project(output_path_str: str, selected_templates: List[Template], run
     ui.press_any_key("We will now step through the templates to generate your project. Press any key to continue...")
 
     out_path = Path(output_path_str)
+    
+    if run_config.debug_manager:
+        run_config.debug_manager.state_change("general", f"Starting project generation at {output_path_str}")
+
     template_files = prepare_objects(out_path, selected_templates, run_config)
     
+    if run_config.debug_manager:
+        run_config.debug_manager.state_change("general", f"Prepared {len(template_files)} template files.")
+
     run_injections(template_files, run_config, output_path_str)
-    refresh_tags_and_configs_after_injections(template_files)
+    refresh_tags_and_configs_after_injections(template_files, run_config)
+    
+    if run_config.debug_manager:
+        run_config.debug_manager.state_change("general", "Entering interactive configuration editor.")
+        
     interactive_config_editor(template_files, ui)
 
     # File generation with progress bar
+    if run_config.debug_manager:
+        run_config.debug_manager.state_change("general", "Generating file content and removing tags.")
+        
     progress = rainbow_tqdm.tqdm(template_files) if run_config.party_mode else tqdm(template_files)
     for tf in progress:
         generate_file_content_data(tf, run_config)
@@ -203,9 +233,14 @@ def create_project(output_path_str: str, selected_templates: List[Template], run
         return
 
     ui.clear()
+    if run_config.debug_manager:
+        run_config.debug_manager.state_change("general", f"Writing files to disk at {out_path}")
+        
     for tf in template_files:
         dest = Path(tf.destination_path)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(tf.content, encoding="utf-8")
     
     ui.success(f"Project generated successfully at: {out_path}")
+    if run_config.debug_manager:
+        run_config.debug_manager.state_change("general", "Project generation finished successfully.")

@@ -11,6 +11,9 @@ from .template import Template
 class UI(ABC):
     """Abstract base class for User Interface."""
     
+    def __init__(self, debug_manager=None):
+        self.debug_manager = debug_manager
+
     def clear(self):
         """Clear the terminal screen."""
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -45,8 +48,13 @@ class UI(ABC):
     def print(self, message: str, style: Optional[str] = None):
         pass
 
-    @abstractmethod
     def error(self, message: str):
+        if self.debug_manager:
+            self.debug_manager.state_change("error", message)
+        self._show_error(message)
+
+    @abstractmethod
+    def _show_error(self, message: str):
         pass
 
     @abstractmethod
@@ -69,7 +77,8 @@ class UI(ABC):
 class RichUI(UI):
     """Rich-based terminal UI."""
     
-    def __init__(self):
+    def __init__(self, debug_manager=None):
+        super().__init__(debug_manager)
         self.console = Console()
 
     def display_file_content(self, title: str, content: str, lexer: Optional[str] = None):
@@ -209,7 +218,7 @@ class RichUI(UI):
     def print(self, message: str, style: Optional[str] = None):
         self.console.print(message, style=style)
 
-    def error(self, message: str):
+    def _show_error(self, message: str):
         self.console.print(f"[red]{message}[/red]")
 
     def warning(self, message: str):
@@ -221,6 +230,9 @@ class RichUI(UI):
 
 class MinimalUI(UI):
     """Simple text-based terminal UI."""
+
+    def __init__(self, debug_manager=None):
+        super().__init__(debug_manager)
 
     def display_current_selection(self, selected_templates: List[Template], auto_selected_ids: List[str], 
                                   all_templates: Dict[str, Template], run_mode: bool = False):
@@ -310,7 +322,7 @@ class MinimalUI(UI):
     def print(self, message: str, style: Optional[str] = None):
         print(message)
 
-    def error(self, message: str):
+    def _show_error(self, message: str):
         print(f"Error: {message}")
 
     def warning(self, message: str):
@@ -328,6 +340,6 @@ class MinimalUI(UI):
         return input(f"{message} [{default}]: ") or default
 
 
-def get_ui(minimal: bool = False) -> UI:
+def get_ui(minimal: bool = False, debug_manager=None) -> UI:
     """Factory function to get the appropriate UI implementation."""
-    return MinimalUI() if minimal else RichUI()
+    return MinimalUI(debug_manager) if minimal else RichUI(debug_manager)

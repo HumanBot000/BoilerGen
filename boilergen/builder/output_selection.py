@@ -21,7 +21,7 @@ def clear_cloned_repo(template_dir: str, minimal_ui: bool, ui):
 
 def ask_for_output_location(selected_templates: List[Template], run_config, template_dir: str):
     """Prompt user for output location and initiate generation."""
-    ui = get_ui(run_config.minimal_ui)
+    ui = get_ui(run_config.minimal_ui, run_config.debug_manager)
     
     default_output = str(Path.cwd() / "output")
     output_path = Path(ui.prompt("Where do you want to generate the output?", default=default_output))

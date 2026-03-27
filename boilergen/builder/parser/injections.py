@@ -107,11 +107,11 @@ def run_injections(template_files: List[TemplateFile], run_config: RunConfig, ou
 
     # Process each target file
     for target_file_path, file_injections in injections_by_file.items():
-        process_file_injections(target_file_path, file_injections, template_files, output_path)
+        process_file_injections(target_file_path, file_injections, template_files, output_path, run_config)
 
 
 def process_file_injections(target_file_path: str, file_injections: List[Tuple],
-                            template_files: List[TemplateFile], output_path: str):
+                            template_files: List[TemplateFile], output_path: str, run_config: RunConfig):
     """Process all injections for a single target file."""
     full_file_path = os.path.join(output_path, target_file_path)
 
@@ -149,6 +149,9 @@ def process_file_injections(target_file_path: str, file_injections: List[Tuple],
             source_lines = f.read().splitlines()
 
         # Apply injection
+        if run_config.debug_manager:
+            run_config.debug_manager.state_change("injections", f"Applying injection to {target_file_path} from {injection.source_file} using {injection.method}")
+        
         content_lines = apply_injection(content_lines, injection, source_lines, template_files, output_path)
 
         # Update tag positions after injection

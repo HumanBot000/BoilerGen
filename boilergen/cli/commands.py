@@ -1,12 +1,16 @@
+import datetime
 import itertools
 import os
 from pathlib import Path
+from typing import Optional
+
 import typer
 from rich.panel import Panel
 from rich.text import Text
 import importlib.metadata
 import boilergen.builder.output_selection
 from boilergen.cli.run_config import RunConfig
+from boilergen.core.debug_manager import DebugType
 from boilergen.core.ui import get_ui
 from boilergen.core.navigator import navigate_templates
 from boilergen.core.config_manager import ConfigManager
@@ -36,6 +40,15 @@ def main(
     )
 ):
     pass
+
+def create_debug_output_file(path:Optional[str]):
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(f"\n--- DEBUG SESSION STARTED: {datetime.datetime.now()} ---\n")
+    except Exception as e:
+        typer.echo(f"Failed to create debug output file: {e}")
+        raise typer.Exit(1)
+
 @app.command()
 def create(
         disable_dependencies: bool = typer.Option(False, "--disable-dependencies",
@@ -45,11 +58,18 @@ def create(
         disable_quote_parsing: bool = typer.Option(False, "--disable-quote-parsing",
                                                    help="Disable automatic quote stripping in configs"),
         dry_run: bool = typer.Option(False, "--dry-run", help="Do not generate files, only show contents"),
-        party_mode: bool = typer.Option(False, "--fiesta", help="🎉 Fiesta mode!")
+        party_mode: bool = typer.Option(False, "--fiesta", help="🎉 Fiesta mode!"),
+        debug:Optional[DebugType ]= typer.Option(None, "--debug", help="Debug mode (tags, injections, all)"),
+        debug_output : Optional[str] = typer.Option(None, "--debug-output", help="Debug output file path")
 ):
     """🚀 Create a new project by selecting templates interactively."""
     ui = get_ui(minimal_ui)
     config_mgr = ConfigManager()
+    if debug_output and not debug:
+        ui.error("--debug-output requires --debug to be set.")
+        raise typer.Exit(1)
+    if debug_output:
+        create_debug_output_file(debug_output)
     try:
         template_dir = config_mgr.resolve_template_dir(str(DEFAULT_TEMPLATE_DIR), ui)
         if not template_dir.exists() or not template_dir.is_dir():
@@ -62,8 +82,13 @@ def create(
             clear_output=clear_output,
             party_mode=party_mode,
             disable_quote_parsing_for_configs=disable_quote_parsing,
-            dry_run=dry_run
+            dry_run=dry_run,
+            debug_type=debug,
+            debug_output=Path(debug_output) if debug_output else None
         )
+        # Re-get UI with debug_manager for error logging
+        ui = get_ui(minimal_ui, run_config.debug_manager)
+        
         selected_templates = navigate_templates(str(template_dir), run_config)
         if not selected_templates:
             ui.warning("Operation cancelled or no templates selected.")
@@ -82,12 +107,28 @@ def create(
 
         ui.display_final_selection(selected_templates, str(template_dir), auto_selected_ids, run_config)
 
+        if run_config.debug_manager:
+            run_config.debug_manager.state_change("general", "Navigation finished, starting output selection.")
+
         # Start generation flow
         boilergen.builder.output_selection.ask_for_output_location(selected_templates, run_config, str(template_dir))
 
+        if run_config.debug_manager:
+            ui.print("\n")
+            ui.display_file_content("log", run_config.debug_manager.get_full_log())
+            ui.press_any_key("Debug log displayed. Press any key to finish...")
+
     except KeyboardInterrupt:
         ui.warning("\nOperation cancelled by user.")
+        # Try to show logs even on cancel if they exist
+        try:
+            if 'run_config' in locals() and run_config.debug_manager:
+                ui.display_file_content("log (cancelled)", run_config.debug_manager.get_full_log())
+                ui.press_any_key("Debug log displayed. Press any key to exit...")
+        except:
+            pass
         raise typer.Exit(0)
+
 
 
 @app.command()
@@ -134,7 +175,6 @@ def templates(
 
 
 def _display_fiesta_tree(path: Path, ui):
-    from .commands import generate_simple_tree_text  # Use existing for now or refactor
     tree_text = generate_simple_tree_text(str(path))
     rainbow_text = Text()
     color_cycle = itertools.cycle(RAINBOW_COLORS)
