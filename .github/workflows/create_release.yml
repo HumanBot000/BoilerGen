@@ -1,0 +1,75 @@
+name: Auto Release on Version Bump
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-and-release:
+    name: Check version bump and create release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract current version from pyproject.toml
+        id: current
+        run: |
+          VERSION=$(grep -m1 '^version' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get latest existing tag
+        id: latest_tag
+        run: |
+          TAG=$(git tag --sort=-version:refname | head -n 1)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Check if tag already exists for this version
+        id: tag_check
+        run: |
+          VERSION="v${{ steps.current.outputs.version }}"
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Collect commit messages since last tag
+        if: steps.tag_check.outputs.exists == 'false'
+        id: changelog
+        run: |
+          LAST_TAG="${{ steps.latest_tag.outputs.tag }}"
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" "$LAST_TAG"..HEAD)
+          fi
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create tag and GitHub release
+        if: steps.tag_check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="v${{ steps.current.outputs.version }}"
+          BODY="${{ steps.changelog.outputs.commits }}
+
+          ---
+          Download now:
+          \`\`\`
+          pip install boilergen --upgrade
+          \`\`\`"
+
+          git tag "$VERSION"
+          git push origin "$VERSION"
+
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --notes "$BODY"

@@ -4,7 +4,7 @@ from pathlib import Path
 import typer
 from rich.panel import Panel
 from rich.text import Text
-
+import importlib.metadata
 import boilergen.builder.output_selection
 from boilergen.cli.run_config import RunConfig
 from boilergen.core.ui import get_ui
@@ -20,8 +20,22 @@ app = typer.Typer(
 
 DEFAULT_TEMPLATE_DIR = Path.cwd() / "boilergen"
 RAINBOW_COLORS = ["red", "yellow", "green", "cyan", "blue", "magenta"]
-
-
+def version_callback(value: bool):
+    if value:
+        typer.echo(f"Current boilergen version is {importlib.metadata.version('boilergen')}")
+        raise typer.Exit()
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        None,
+        "--version",
+        "-v",
+        help="Show version and exit",
+        callback=version_callback,
+        is_eager=True,
+    )
+):
+    pass
 @app.command()
 def create(
         disable_dependencies: bool = typer.Option(False, "--disable-dependencies",
