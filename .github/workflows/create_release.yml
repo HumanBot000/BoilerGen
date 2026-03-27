@@ -3,7 +3,7 @@ name: Auto Release on Version Bump
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   check-and-release:
