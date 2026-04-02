@@ -50,11 +50,16 @@ class TagDebugManager(DebugManager):
         if channel != "tags":
             return
         
-        tf = args[0]
-        action = args[2]
-        item = args[3] if len(args) > 3 else "N/A"
-        
-        self.log(f"TAG UPDATE [{action}] in {tf.destination_path}: {item}")
+        # Can be (message,) or (tf, full_list, action, item)
+        if len(args) == 1:
+            self.log(f"TAG INFO: {args[0]}")
+        elif len(args) >= 4:
+            tf = args[0]
+            action = args[2]
+            item = args[3]
+            self.log(f"TAG UPDATE [{action}] in {tf.destination_path}: {item}")
+        else:
+            self.log(f"TAG: {args}")
 
 
 class InjectionDebugManager(DebugManager):

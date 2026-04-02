@@ -129,7 +129,7 @@ def refresh_tags_and_configs_after_injections(template_files: List[TemplateFile]
     if run_config.debug_manager:
         run_config.debug_manager.state_change("general", "Refreshing tags and configs after injections.")
     for tf in template_files:
-        tf.tags = extract_tags(tf.content)
+        tf.tags = extract_tags(tf.content, run_config.debug_manager)
         new_configs = extract_configs(tf.content)
         old_map = {c.identifier: c for c in tf.configs}
         for nc in new_configs:

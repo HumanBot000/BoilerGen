@@ -1,5 +1,6 @@
+import re
 import boilergen.cli.run_config
-from boilergen.builder.parser.tags import TemplateFile
+from boilergen.builder.parser.tags import TemplateFile, TAG_OPENING_REGEX, TAG_CLOSING_REGEX
 
 
 def generate_file_content_data(file: TemplateFile, run_config: boilergen.cli.run_config.RunConfig):
@@ -15,13 +16,13 @@ def generate_file_content_data(file: TemplateFile, run_config: boilergen.cli.run
                     end += 1
         text = text[:start] + config.insertion_value + text[end:]
 
+    # Tag removal - robust against line shifts from configs
+    # We replace the entire line containing a tag with an empty string to maintain original behavior
     lines = text.splitlines()
-    # Tag removal
-    for index, tag in enumerate(sorted(file.tags, key=lambda t: t.line_start, reverse=True)):
-        lines[tag.line_start - 1] = ""
-        lines[tag.line_end - 1] = ""
+    for i, line in enumerate(lines):
+        if re.search(TAG_OPENING_REGEX, line) or re.search(TAG_CLOSING_REGEX, line):
+            lines[i] = ""
     
-    text = "\n".join(lines)
-    file.content = text
+    file.content = "\n".join(lines)
 
 

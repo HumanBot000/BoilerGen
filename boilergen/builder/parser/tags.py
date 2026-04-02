@@ -3,8 +3,8 @@ from typing import List, Union, Optional, Callable, Any
 from boilergen.builder.parser.configs import ValueConfig
 from boilergen.core.observable import ObservableList
 
-TAG_OPENING_REGEX = r".*<<boilergen:(?!config\b)[^>\s]+.*"
-TAG_CLOSING_REGEX = r".*boilergen:(?!config\b)[^>\s]+>>.*"
+TAG_OPENING_REGEX = r"<<boilergen:(?!config\b)([a-zA-Z0-9_-]+)"
+TAG_CLOSING_REGEX = r"boilergen:(?!config\b)([a-zA-Z0-9_-]+)>>"
 
 
 class Tag:
@@ -54,19 +54,19 @@ class TemplateFile:
         if self.tag_change_callback:
             self.tag_change_callback(self, *args)
 
-def extract_tags(file_content: str):
+def extract_tags(file_content: str, debug_manager=None):
     opening_tags = []
     closing_tags = []
 
     for line_number, line in enumerate(file_content.splitlines(), start=1):
         open_match = re.search(TAG_OPENING_REGEX, line)
         if open_match:
-            identifier = open_match.group().split(":")[1]
+            identifier = open_match.group(1)
             opening_tags.append((identifier, line_number))
 
         close_match = re.search(TAG_CLOSING_REGEX, line)
         if close_match:
-            identifier = close_match.group().split(":")[1].rstrip(">>")
+            identifier = close_match.group(1)
             closing_tags.append((identifier, line_number))
 
     tags = []
@@ -76,4 +76,10 @@ def extract_tags(file_content: str):
                 tags.append(Tag(identifier, start_line, end_line))
                 del closing_tags[i]
                 break
+    
+    if debug_manager:
+        debug_manager.state_change("tags", f"Scanned content and found {len(tags)} tags")
+        for tag in tags:
+            debug_manager.state_change("tags", f"Found tag: {tag}")
+            
     return tags

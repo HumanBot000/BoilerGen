@@ -120,15 +120,24 @@ def process_file_injections(target_file_path: str, file_injections: List[Tuple],
         if os.path.normpath(template_file.destination_path) == os.path.normpath(full_file_path):
             template_file_of_target = template_file
             break
+    
+    if not template_file_of_target:
+        if run_config.debug_manager:
+            run_config.debug_manager.state_change("error", f"Injection target file not found: {target_file_path}")
+        return
+
     # Read target file
     content_lines = template_file_of_target.content.splitlines()
 
     # Sort injections by position (line-based first, then tag-based)
+    # We sort descending so that applying one doesn't shift the positions of the ones that come BEFORE it.
+    # Actually, the logic updates tag positions in TemplateFile objects, so we can go ascending.
+    # But if multiple injections target the SAME line number directly (unlikely but possible), sorting matters.
     def get_injection_position(injection_tuple):
         template_file, injection = injection_tuple
 
         if injection.line is not None:
-            return (0, injection.line)  # Line-based gets priority
+            return (0, injection.line)
 
         if injection.target_tag is not None:
             target_template = find_template_file(template_files, injection, output_path)
@@ -137,7 +146,7 @@ def process_file_injections(target_file_path: str, file_injections: List[Tuple],
                     if str(tag.tag_identifier) == str(injection.target_tag):
                         return (1, tag.line_start)
 
-        return (2, 0)  # Fallback
+        return (2, 0)
 
     file_injections.sort(key=get_injection_position)
 
@@ -152,22 +161,25 @@ def process_file_injections(target_file_path: str, file_injections: List[Tuple],
         if run_config.debug_manager:
             run_config.debug_manager.state_change("injections", f"Applying injection to {target_file_path} from {injection.source_file} using {injection.method}")
         
-        content_lines = apply_injection(content_lines, injection, source_lines, template_files, output_path)
+        content_lines = apply_injection(content_lines, injection, source_lines, template_files, output_path, run_config)
 
         # Update tag positions after injection
-        update_tag_positions(template_file, injection, len(source_lines), template_files, output_path)
+        update_tag_positions(template_file, injection, len(source_lines), template_files, output_path, run_config)
 
     template_file_of_target.content = "\n".join(content_lines)
 
 
 def apply_injection(content_lines: List[str], injection: Injection, source_lines: List[str],
-                    template_files: List[TemplateFile], output_path: str) -> List[str]:
+                    template_files: List[TemplateFile], output_path: str, run_config: RunConfig) -> List[str]:
     """Apply a single injection to the content lines."""
 
-    # Line-based injection
+    # Line-based injection (1-based from config)
     if injection.line is not None:
-        line_idx = injection.line
+        line_idx = injection.line - 1 # Convert to 0-based
         method = injection.method
+        
+        if run_config.debug_manager:
+            run_config.debug_manager.state_change("injections", f"Line-based injection at line {injection.line} (index {line_idx}, method: {method})")
 
         if method == InjectionMethod.REPLACE:
             content_lines[line_idx:line_idx + 1] = source_lines
@@ -182,9 +194,11 @@ def apply_injection(content_lines: List[str], injection: Injection, source_lines
     if injection.target_tag is not None:
         target_template = find_template_file(template_files, injection, output_path)
         if not target_template:
+            if run_config.debug_manager:
+                run_config.debug_manager.state_change("injections", f"Target template for tag '{injection.target_tag}' not found.")
             return content_lines
 
-        # Find tag bounds
+        # Find tag bounds (1-based from extract_tags)
         tag_start, tag_end = None, None
         for tag in target_template.tags:
             if str(tag.tag_identifier) == str(injection.target_tag):
@@ -192,25 +206,37 @@ def apply_injection(content_lines: List[str], injection: Injection, source_lines
                 break
 
         if tag_start is None:
+            if run_config.debug_manager:
+                run_config.debug_manager.state_change("injections", f"Tag '{injection.target_tag}' not found in target template.")
             return content_lines
 
         method = injection.method
+        if run_config.debug_manager:
+            run_config.debug_manager.state_change("injections", f"Tag-based injection at tag '{injection.target_tag}' (lines: {tag_start}-{tag_end}, method: {method})")
+            
+        # Convert to 0-based indices for slicing
+        # content_lines is a list from splitlines()
+        idx_start = tag_start - 1
+        idx_end = tag_end # Exclusive end for slice includes line tag_end (which is index tag_end - 1)
+        
         if method == InjectionMethod.REPLACE:
-            content_lines[tag_start:tag_end] = source_lines
+            content_lines[idx_start:idx_end] = source_lines
         elif method == InjectionMethod.BEFORE:
-            content_lines[tag_start:tag_start] = source_lines
+            content_lines[idx_start:idx_start] = source_lines
         elif method == InjectionMethod.AFTER:
-            content_lines[tag_end + 1:tag_end + 1] = source_lines
+            content_lines[idx_end:idx_end] = source_lines
         elif method == InjectionMethod.START:
-            content_lines[tag_start + 1:tag_start + 1] = source_lines
+            # Inside the tag, after the opening tag line
+            content_lines[idx_start + 1:idx_start + 1] = source_lines
         elif method == InjectionMethod.END:
-            content_lines[tag_end:tag_end] = source_lines
+            # Inside the tag, before the closing tag line
+            content_lines[idx_end - 1:idx_end - 1] = source_lines
 
     return content_lines
 
 
 def update_tag_positions(template_file: TemplateFile, injection: Injection, source_line_count: int,
-                         template_files: List[TemplateFile], output_path: str):
+                         template_files: List[TemplateFile], output_path: str, run_config: RunConfig):
     """Update tag positions after an injection modifies the file structure."""
     target_template = find_template_file(template_files, injection, output_path)
     if not target_template:
@@ -225,13 +251,16 @@ def update_tag_positions(template_file: TemplateFile, injection: Injection, sour
             # Replacing tag content
             for tag in target_template.tags:
                 if str(tag.tag_identifier) == str(injection.target_tag):
-                    original_line_count = tag.line_end - tag.line_start
+                    original_line_count = tag.line_end - tag.line_start + 1
                     line_delta = source_line_count - original_line_count
                     break
             else:
                 line_delta = 0
     else:
         line_delta = source_line_count  # Adding lines
+
+    if run_config.debug_manager and line_delta != 0:
+        run_config.debug_manager.state_change("injections", f"Injection caused line shift of {line_delta} lines in {target_template.destination_path}")
 
     # Get injection position for updating tags that come after
     injection_pos = None
@@ -240,14 +269,31 @@ def update_tag_positions(template_file: TemplateFile, injection: Injection, sour
     elif injection.target_tag is not None:
         for tag in target_template.tags:
             if str(tag.tag_identifier) == str(injection.target_tag):
-                injection_pos = tag.line_start
+                # Where did we insert?
+                if method == InjectionMethod.BEFORE:
+                    injection_pos = tag.line_start - 1
+                elif method == InjectionMethod.AFTER:
+                    injection_pos = tag.line_end
+                elif method == InjectionMethod.REPLACE:
+                    injection_pos = tag.line_start - 1
+                elif method == InjectionMethod.START:
+                    injection_pos = tag.line_start
+                elif method == InjectionMethod.END:
+                    injection_pos = tag.line_end - 1
                 break
 
     if injection_pos is not None:
         # Update all tag positions that come after the injection
+        updated_count = 0
         for file in template_files:
-            for tag in file.tags:
-                if tag.line_start > injection_pos:
-                    tag.line_start += line_delta
-                if tag.line_end > injection_pos:
-                    tag.line_end += line_delta
+            # Only update if it's the same file
+            if file.destination_path == target_template.destination_path:
+                for tag in file.tags:
+                    if tag.line_start > injection_pos:
+                        tag.line_start += line_delta
+                        updated_count += 1
+                    if tag.line_end > injection_pos:
+                        tag.line_end += line_delta
+
+        if run_config.debug_manager and updated_count > 0:
+            run_config.debug_manager.state_change("injections", f"Updated {updated_count} subsequent tags in {target_template.destination_path}")
