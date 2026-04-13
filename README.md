@@ -10,10 +10,25 @@ No more manual integration steps. No more forgotten imports. Just working boiler
 
 1. Run `pip install boilergen` 
 2. [Set up your first templates](https://github.com/HumanBot000/BoilerGen?tab=readme-ov-file#templates)  
-3. Fill in the location of your templates in the config file. (can be found via `boilergen config`)
+3. Configure your template source via `boilergen config`:
+    - **Local:** Set `TemplateLocation` to your local folder.
+    - **Remote:** Set `TemplateRepository` to a git URL. (It will be cloned to `./cloned_templates`)
 4. Run `boilergen create` and follow the instructions.
     - Use `--dry-run` to preview changes without writing files.
 → All available commands can be accessed by `boilergen --help`.
+
+### Cleanup
+
+BoilerGen provides a `cleanup` command to remove redundant empty lines and trim leading/trailing whitespace from files. This is particularly useful after tag injections which might leave empty lines behind.
+
+```bash
+boilergen cleanup [path]
+```
+
+We recommend adding this to your `post-generation.txt` hook for automatic cleanup:
+```text
+boilergen cleanup
+```
 
 
 ## Templates
@@ -123,6 +138,12 @@ stateDiagram-v2
     step1 --> step2
     step2 --> step3
 ```
+
+### Interactive Editor
+During `boilergen create`, if a template contains configurations, a full-screen interactive editor will open. 
+- Edit the values on the right side of the `=` sign.
+- Press **Ctrl+S** to confirm and save your changes.
+- Ensure all keys remain present and the format stays `key = value`.
 ## Injections
 Injections are a way to specify insertion/editing operations to files of foreign Templates.
 

@@ -12,6 +12,7 @@ It is derived from the source code and the official template library and is more
 | `boilergen create` | Interactive project generation wizard |
 | `boilergen templates` | Print a tree of all available templates |
 | `boilergen config` | Show the path and content of the config file |
+| `boilergen cleanup [path]` | Clean up redundant empty lines in a file or directory |
 
 ### `boilergen create` flags
 
@@ -22,7 +23,6 @@ It is derived from the source code and the official template library and is more
 | `--clear-output` | `false` | Delete output directory before generation if it already exists |
 | `--disable-quote-parsing` | `false` | Disable automatic surrounding-quote removal for config values |
 | `--dry-run` | `false` | Preview generated file content without writing anything to disk |
-| `--fiesta` | `false` | 🎉 Rainbow progress bars |
 
 ### Config file
 
@@ -190,6 +190,17 @@ template.yaml `config:` block
        ↓
 Inline default value in template file  (lowest)
 ```
+
+### Interactive Config Editor
+
+During the `create` flow, BoilerGen opens a full-screen interactive editor (powered by `prompt-toolkit`) for any template file containing configuration placeholders.
+
+**Usage:**
+- The editor shows a list of `key = value` pairs.
+- The user must only modify the `value` part.
+- **Save/Confirm:** `Ctrl+S`
+- **Cancel:** `Ctrl+C` (aborts the entire generation process)
+- **Validation:** The editor ensures all original keys are still present before allowing a save.
 
 ---
 

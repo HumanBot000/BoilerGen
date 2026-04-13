@@ -9,6 +9,7 @@ from rich.panel import Panel
 from rich.text import Text
 import importlib.metadata
 import boilergen.builder.output_selection
+from boilergen.builder.cleanup import cleanup_directory
 from boilergen.cli.run_config import RunConfig
 from boilergen.core.debug_manager import DebugType
 from boilergen.core.ui import get_ui
@@ -172,6 +173,23 @@ def templates(
     # Cleanup cloned repo if any
     parent_dir = template_dir.parent
     boilergen.builder.output_selection.clear_cloned_repo(str(parent_dir), minimal_ui, ui)
+
+
+@app.command()
+def cleanup(
+    path: Path = typer.Argument(default=Path.cwd(), help="Path to the directory or file to clean up"),
+    minimal_ui: bool = typer.Option(False, "--minimal-ui", help="Basic terminal compatibility"),
+):
+    """🧹 Clean up files by removing multiple consecutive empty lines and trimming leading/trailing ones."""
+    ui = get_ui(minimal_ui)
+    
+    if not path.exists():
+        ui.error(f"Path '{path}' does not exist.")
+        raise typer.Exit(1)
+        
+    ui.print(f"Cleaning up path: [bold]{path}[/bold]")
+    cleanup_directory(path)
+    ui.success("Cleanup complete.")
 
 
 def _display_fiesta_tree(path: Path, ui):
