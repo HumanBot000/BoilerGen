@@ -17,18 +17,6 @@ No more manual integration steps. No more forgotten imports. Just working boiler
     - Use `--dry-run` to preview changes without writing files.
 → All available commands can be accessed by `boilergen --help`.
 
-### Cleanup
-
-BoilerGen provides a `cleanup` command to remove redundant empty lines and trim leading/trailing whitespace from files. This is particularly useful after tag injections which might leave empty lines behind.
-
-```bash
-boilergen cleanup [path]
-```
-
-We recommend adding this to your `post-generation.txt` hook for automatic cleanup:
-```text
-boilergen cleanup
-```
 
 
 ## Templates
@@ -213,6 +201,18 @@ Currently supported events are:
 Inside those files, you can define shell commands to be executed. Each command is separated by a newline. The execution order is top to bottom.
 
 ---
+### Cleanup
+
+BoilerGen provides a `cleanup` command to remove redundant empty lines and trim leading/trailing whitespace from files. This is particularly useful after tag injections which might leave empty lines behind.
+
+```bash
+boilergen cleanup [path]
+```
+
+We recommend adding this to your `post-generation.txt` hook for automatic cleanup:
+```text
+boilergen cleanup
+```
 
 ## Debugging
 
