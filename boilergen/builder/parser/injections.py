@@ -61,10 +61,21 @@ def parse_injections(yaml_data: dict, yaml_file_path: str) -> List[Injection]:
 
     for config in yaml_data.get("injections", []):
         # Parse method
-        if config.get("method") == "replace":
+        method_config = config.get("method")
+        
+        if method_config == "replace" or (isinstance(method_config, dict) and "replace" in method_config):
             method = InjectionMethod.REPLACE
+        elif isinstance(method_config, dict) and "insert" in method_config:
+            insert_val = method_config["insert"]
+            if isinstance(insert_val, list) and len(insert_val) > 0:
+                method = InjectionMethod(insert_val[0])
+            else:
+                method = InjectionMethod(insert_val)
         else:
-            method = InjectionMethod(config["method"]["insert"][0])
+            try:
+                method = InjectionMethod(method_config)
+            except ValueError:
+                method = InjectionMethod.END
 
         injection = Injection(
             target_template_name=config["target"],
@@ -286,7 +297,7 @@ def update_tag_positions(template_file: TemplateFile, injection: Injection, sour
         # Update all tag positions that come after the injection
         updated_count = 0
         for file in template_files:
-            # Only update if it's the same file
+            # Only update if it's the same fileL
             if file.destination_path == target_template.destination_path:
                 for tag in file.tags:
                     if tag.line_start > injection_pos:
