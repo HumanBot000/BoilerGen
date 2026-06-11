@@ -119,7 +119,8 @@ def prepare_objects(output_path: Path, selected_templates: List[Template], run_c
                 with open(injections_yaml, "r", encoding="utf-8") as f:
                     inj_data = yaml.safe_load(f)
                 for tf in template_files:
-                    tf.injections = parse_injections(inj_data, str(injections_yaml))
+                    new_injections = parse_injections(inj_data, str(injections_yaml))
+                    tf.injections.extend(new_injections)
 
     return template_files
 
